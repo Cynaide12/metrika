@@ -1,0 +1,26 @@
+env: "local" #окружение, в котором запущен проект. от него зависит поведение логов. в режиме prod пишется в файл, в local отображаются в консоли
+log_file_path: "./logs/go_template.log"  #путь для хранения логов
+allowed_file_extensions: ".pdf" #разрешенные расширения файлов - .pdf, .docx и т.п. разделитель - ;
+max_file_size: 20 #максимальный разрешенный размер файла в мб(скан документа)
+storage_path: "./storage"
+jwt_secret: "kjh;fljkhl;%#2SDFPO123SDAG" #соль для генерации jwt токена
+max_request_size: 256
+files_storage_path: "./var/uploads"
+http_server:
+  address: ":8080"
+  timeout: 4s
+  idle_timeout: 60s
+db_server:  #параметры для соединения с базой данных
+  host: "localhost"
+  port: 5432
+  username: "postgres"
+  password: "root"
+  db_name: "go_template"
+smtp_server: #параметры smtp клиента для отправки сообщений на почту
+  host: "mail.kst-energo.ru"
+  port: 465
+  username: "kst-go_template@kst-energo.ru"
+  password: "DjF66Y97s$%AuNLsGG"
+  sender: "AIS"
+frontend:
+  app_url: "http://localhost:5173" #адрес(домен) фронтенда, чтобы при отправке уведомления в тг можно было указать ссылку на фронт.
