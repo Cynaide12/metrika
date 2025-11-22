@@ -1,5 +1,5 @@
 //изменить название
-module go_template
+module metrika
 
 go 1.23.4
 

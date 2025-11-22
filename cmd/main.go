@@ -1,11 +1,11 @@
 package main
 
 import (
-	"go_template/internal/config"
-	"go_template/internal/logger"
-	"go_template/internal/storage"
-	"go_template/lib/logger/sl"
 	"log/slog"
+	"metrika/internal/config"
+	"metrika/internal/logger"
+	"metrika/internal/repository"
+	"metrika/lib/logger/sl"
 	"net/http"
 	"os"
 	"time"
@@ -16,6 +16,8 @@ import (
 	"github.com/robfig/cron/v3"
 )
 
+//TODO: сделать инит роутов и можно попробовать написать генератор моковых данных
+
 func main() {
 	cfg := config.MustLoad()
 
@@ -24,7 +26,7 @@ func main() {
 		panic(err)
 	}
 
-	log.Info("starting go_template_server", slog.String("env", cfg.Env))
+	log.Info("starting metrika_server", slog.String("env", cfg.Env))
 
 	log.Debug("debug messages are enabled")
 
@@ -32,14 +34,13 @@ func main() {
 
 	log.Info("logs rotation are enabled")
 
-	storage, err := storage.New(cfg)
+	storage, err := repository.New(cfg)
 	if err != nil {
 		log.Error("failed connect to db", sl.Err(err))
 		os.Exit(1)
 	}
 
 	log.Info("db connect succesful")
-
 
 	log.Info("scheduler start succesful")
 
@@ -57,7 +58,7 @@ func setupLogRotation(rotate func()) {
 	c.Start()
 }
 
-func initRouter(cfg *config.Config, log *slog.Logger, storage *storage.Storage, ) {
+func initRouter(cfg *config.Config, log *slog.Logger, storage *repository.Repository) {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -89,8 +90,6 @@ func initRouter(cfg *config.Config, log *slog.Logger, storage *storage.Storage, 
 	}))
 
 	//роуты тут
-
-
 
 	log.Info("starting server", slog.String("address", srv.Addr))
 

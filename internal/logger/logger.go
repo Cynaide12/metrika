@@ -1,10 +1,10 @@
 package logger
 
 import (
-	"go_template/internal/config"
-	slogpretty "go_template/lib/logger/handlers"
 	"io"
 	"log/slog"
+	"metrika/internal/config"
+	slogpretty "metrika/lib/logger/handlers"
 	"net/http"
 	"os"
 	"time"

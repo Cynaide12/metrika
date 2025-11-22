@@ -1,20 +1,21 @@
-package storage
+package repository
 
 import (
 	"database/sql"
 	"fmt"
-	"go_template/internal/config"
+	"metrika/internal/config"
+	"metrika/internal/models"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
-type Storage struct {
+type Repository struct {
 	GormDB *gorm.DB
 	SqlDB  *sql.DB
 }
 
-func New(cfg *config.Config) (*Storage, error) {
+func New(cfg *config.Config) (*Repository, error) {
 
 	const fn = "internal.storage.New"
 
@@ -37,19 +38,28 @@ func New(cfg *config.Config) (*Storage, error) {
 	}
 
 	//миграции
-	GormDB.AutoMigrate(
+	GormDB.AutoMigrate()
 
-	)
-
-	return &Storage{
+	return &Repository{
 		GormDB: GormDB,
 		SqlDB:  SqlDB,
 	}, nil
 }
 
-func (s *Storage) WithTx(tx *gorm.DB) *Storage {
-	return &Storage{
+func (s *Repository) WithTx(tx *gorm.DB) *Repository {
+	return &Repository{
 		GormDB: tx,
 		SqlDB:  s.SqlDB,
 	}
+}
+
+// * EVENTS
+func (s *Repository) SaveEvents(events []models.Event) error {
+	var fn = "internal.repository.SaveEvent"
+
+	if err := s.GormDB.Model(&models.Event{}).Create(&events).Error; err != nil {
+		return fmt.Errorf("%s: %w", fn, err)
+	}
+
+	return nil
 }

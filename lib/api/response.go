@@ -17,8 +17,9 @@ const (
 	StatusError = "Error"
 	StatusAlreadyExists = "AlreadyExists"
 	StatusFileExtNotAllowed = "FileExtNotAllowed"
-	StatusBadFileSize = "BadFi"
+	StatusBadFileSize = "BadFileSize"
 	StatusNotFound = "NotFound"
+	StatusBadRequest = "BadRequest"
 )
 
 func OK() Response {

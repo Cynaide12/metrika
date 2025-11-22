@@ -1,7 +1,7 @@
 package lib_cookie
 
 import (
-	lib_jwt "go_template/lib/jwt"
+	lib_jwt "metrika/lib/jwt"
 	"net/http"
 )
 
