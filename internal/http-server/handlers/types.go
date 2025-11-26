@@ -16,6 +16,6 @@ type AddEventRequest struct {
 	UserID    string                 `json:"user_id" validate:"required"`
 	PageURL   string                 `json:"page_url" validate:"required"`
 	Element   string                 `json:"element"`
-	Timestamp time.Time              `json:"timestamp" validate:"required"`
+	Timestamp time.Time              `json:"timestamp"`
 	Data      map[string]interface{} `json:"data"`
 }

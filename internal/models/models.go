@@ -9,5 +9,5 @@ type Event struct {
 	PageURL   string                 `gorm:"column:page_url;NOT NULL"`
 	Element   string                 `gorm:"column:element;NOT NULL"`
 	Timestamp time.Time              `gorm:"column:timestamp;NOT NULL"`
-	Data      map[string]interface{} `gorm:"column:data;NOT NULL"`
+	// Data      map[string]interface{} `gorm:"column:data;NOT NULL"`
 }

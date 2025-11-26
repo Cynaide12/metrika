@@ -1,6 +1,7 @@
 package tracker
 
 import (
+	"log"
 	"metrika/internal/models"
 	"time"
 )
@@ -14,7 +15,7 @@ type Tracker struct {
 }
 
 type StorageHandler interface {
-	SaveEvents(events []models.Event)
+	SaveEvents(events []models.Event) error
 }
 
 func New(batchSize int, interval time.Duration, buferSize int64, handler StorageHandler) *Tracker {
@@ -26,12 +27,14 @@ func New(batchSize int, interval time.Duration, buferSize int64, handler Storage
 		handler:   handler,
 	}
 
+	go tr.saver()
+
 	return &tr
 }
 
 func (r *Tracker) saver() {
 	ticker := time.NewTicker(r.Interval)
-	batch := make([]models.Event, 0, r.BatchSize)
+	batch := make([]models.Event,0, r.BatchSize)
 
 	for {
 		select {
@@ -41,10 +44,14 @@ func (r *Tracker) saver() {
 			if len(batch) >= r.BatchSize {
 				r.handler.SaveEvents(batch)
 				batch = batch[:0]
+				log.Println("СОХРАНЯЮ ИВЫЕНТ")
 			}
 		case <-ticker.C:
+			if len(batch) > 0{
 			r.handler.SaveEvents(batch)
 			batch = batch[:0]
+			log.Println("СОХРАНЯЮ ИВЫЕНТ")
+			}
 		}
 	}
 }

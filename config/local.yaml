@@ -1,6 +1,6 @@
 env: "local" #окружение, в котором запущен проект. от него зависит поведение логов. в режиме prod пишется в файл, в local отображаются в консоли
 log_file_path: "./logs/metrika.log"  #путь для хранения логов
-jwt_secret: "" #соль для генерации jwt токена
+jwt_secret: "1312312321asdzfsdf3245[uq3878ogdfio0yp9q3y8725yosdfopigjqh8346rt712q835t&^O@#&$%YWEPFID]" #соль для генерации jwt токена
 max_request_size: 256
 http_server:
   address: ":8080"
@@ -11,6 +11,6 @@ db_server:  #параметры для соединения с базой дан
   port: 5432
   username: "postgres"
   password: "root"
-  db_name: ""
+  db_name: "metrika"
 frontend:
   app_url: "http://localhost:5173" #адрес(домен) фронтенда.

@@ -12,7 +12,6 @@ import (
 type Config struct {
     Env                       string     `yaml:"env" env-default:"local" env-required:"true" env:"ENV"`
     LogFilePath               string     `yaml:"log_file_path" env-required:"true" env-default:".logs/apm_server.log" env:"LOG_FILE_PATH"`
-    StoragePath               string     `yaml:"storage_path" env-required:"true" env:"STORAGE_PATH"`
     JWTSecret                 string     `yaml:"jwt_secret" env-required:"true" env:"JWT_SECRET"`
     MaxRequestSize            int        `yaml:"max_request_size" env-default:"64" env:"MAX_REQUEST_SIZE"`
     FilesStoragePath          string     `yaml:"files_storage_path" env-default:"./var/uploads" env:"FILES_STORAGE_PATH"`
@@ -21,7 +20,7 @@ type Config struct {
     MaxFileSize               int64      `yaml:"max_file_size" env-default:"20" env:"MAX_FILE_SIZE"`
     HTTPServer                HTTPServer `yaml:"http_server"`
     DBServer                  DBServer   `yaml:"db_server"`
-    SMTPServer                SMTPServer `yaml:"smtp_server"`
+    // SMTPServer                SMTPServer `yaml:"smtp_server"`
     Frontend                  Frontend   `yaml:"frontend"`
 }
 
@@ -39,13 +38,13 @@ type DBServer struct {
     DBName   string `yaml:"db_name" env-required:"true" env:"DB_NAME"`
 }
 
-type SMTPServer struct {
-    Host     string `yaml:"host" env-required:"true" env:"SMTP_HOST"`
-    Port     int    `yaml:"port" env-required:"true" env:"SMTP_PORT"`
-    Username string `yaml:"username" env-required:"true" env:"SMTP_USERNAME"`
-    Password string `yaml:"password" env-required:"true" env:"SMTP_PASSWORD"`
-    Sender   string `yaml:"sender" env-required:"true" env:"SMTP_SENDER"`
-}
+// type SMTPServer struct {
+//     Host     string `yaml:"host" env-required:"true" env:"SMTP_HOST"`
+//     Port     int    `yaml:"port" env-required:"true" env:"SMTP_PORT"`
+//     Username string `yaml:"username" env-required:"true" env:"SMTP_USERNAME"`
+//     Password string `yaml:"password" env-required:"true" env:"SMTP_PASSWORD"`
+//     Sender   string `yaml:"sender" env-required:"true" env:"SMTP_SENDER"`
+// }
 
 type Frontend struct {
     AppUrl string `yaml:"app_url" env-required:"true" env:"FRONTEND_APP_URL"`

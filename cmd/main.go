@@ -3,8 +3,12 @@ package main
 import (
 	"log/slog"
 	"metrika/internal/config"
+	"metrika/internal/http-server/handlers"
 	"metrika/internal/logger"
+	"metrika/internal/mock"
 	"metrika/internal/repository"
+	"metrika/internal/service"
+	"metrika/internal/tracker"
 	"metrika/lib/logger/sl"
 	"net/http"
 	"os"
@@ -40,12 +44,21 @@ func main() {
 		os.Exit(1)
 	}
 
+	tracker := tracker.New(1000, time.Second, 10000, storage)
+	mockGenerator := mock.New(time.Second, 1000, log, 2500, 10000, 5000, tracker)
+
+	//генерация моковых данных
+	go mockGenerator.StartEventsGenerator()
+
+	
+
 	log.Info("db connect succesful")
 
 	log.Info("scheduler start succesful")
 
-	initRouter(cfg, log, storage)
+	initRouter(cfg, log, storage, tracker)
 }
+
 
 func setupLogRotation(rotate func()) {
 	//запускаем ротацию логов каждые сутки
@@ -58,7 +71,7 @@ func setupLogRotation(rotate func()) {
 	c.Start()
 }
 
-func initRouter(cfg *config.Config, log *slog.Logger, storage *repository.Repository) {
+func initRouter(cfg *config.Config, log *slog.Logger, storage *repository.Repository, tracker *tracker.Tracker) {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -89,7 +102,9 @@ func initRouter(cfg *config.Config, log *slog.Logger, storage *repository.Reposi
 		Debug:            true,
 	}))
 
-	//роуты тут
+	ms := service.New(storage, log, tracker)
+
+	handlers.New(log, ms, r)
 
 	log.Info("starting server", slog.String("address", srv.Addr))
 

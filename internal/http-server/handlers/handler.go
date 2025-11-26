@@ -6,6 +6,7 @@ import (
 	response "metrika/lib/api"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
 )
@@ -15,11 +16,16 @@ type Handler struct {
 	service HandlerService
 }
 
-func New(log *slog.Logger, service HandlerService) *Handler {
-	return &Handler{
+func New(log *slog.Logger, service HandlerService, r chi.Router) *Handler {
+
+	h := &Handler{
 		log:     log,
 		service: service,
 	}
+
+	r.Post("/api/v1/events", h.AddEvent())
+
+	return h
 }
 
 func (h Handler) AddEvent() http.HandlerFunc {
@@ -47,7 +53,7 @@ func (h Handler) AddEvent() http.HandlerFunc {
 			SessionID: req.SessionID,
 			UserID:    req.UserID,
 			Element:   req.Element,
-			Data:      req.Data,
+			// Data:      req.Data,
 			Type:      req.Type,
 			Timestamp: req.Timestamp,
 			PageURL:   req.PageURL,
@@ -60,7 +66,6 @@ func (h Handler) AddEvent() http.HandlerFunc {
 		// 	render.JSON(w, r, response.ErrorWithStatus(response.StatusError, "failed to add event"))
 		// 	return
 		// }
-
 
 		//чтобы не блокировать
 		go h.service.AddEvent(&event, log)
