@@ -53,7 +53,7 @@ func (s *Repository) WithTx(tx *gorm.DB) *Repository {
 	}
 }
 
-// * EVENTS
+// *EVENTS
 func (s *Repository) SaveEvents(events []models.Event) error {
 	var fn = "internal.repository.SaveEvent"
 
@@ -62,4 +62,27 @@ func (s *Repository) SaveEvents(events []models.Event) error {
 	}
 
 	return nil
+}
+
+// *SESSIONS
+func (s *Repository) CreateNewSession(session *models.UserSession) error {
+	var fn = "internal.repository.CreateNewSession"
+
+	if err := s.GormDB.Model(&models.UserSession{}).Create(&session).Error; err != nil {
+		return fmt.Errorf("%s: %w", fn, err)
+	}
+
+	return nil
+}
+
+// *USERS
+
+func (s *Repository) GetOrCreateUser(fingerprint string, domain_id uint) (models.User, error) {
+	var fn = "internal.repository.GetUserByFingerprint"
+
+	if err := s.GormDB.Model(&models.UserSession{}).Where("f_id = ?", fingerprint).FirstOrCreate(&models.User{Fingerprint: fingerprint, DomainID: domain_id}).Error; err != nil {
+		return models.User{}, fmt.Errorf("%s: %w", fn, err)
+	}
+
+	return models.User{}, nil
 }

@@ -7,7 +7,7 @@ import (
 )
 
 type HandlerService interface {
-	AddEvent(e *models.Event, log *slog.Logger) 
+	AddEvent(e *models.Event, log *slog.Logger)
 }
 
 type AddEventRequest struct {
@@ -19,3 +19,9 @@ type AddEventRequest struct {
 	Timestamp time.Time              `json:"timestamp"`
 	Data      map[string]interface{} `json:"data"`
 }
+
+type CreateNewSessionRequest struct {
+	FingerprintID string `json:"f_id"`
+}
+
+

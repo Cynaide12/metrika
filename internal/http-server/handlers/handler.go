@@ -59,18 +59,31 @@ func (h Handler) AddEvent() http.HandlerFunc {
 			PageURL:   req.PageURL,
 		}
 
-		// if err := h.service.AddEvent(&event, log); err != nil {
-		// 	log.Error("failed to add event", sl.Err(err))
-
-		// 	w.WriteHeader(http.StatusInternalServerError)
-		// 	render.JSON(w, r, response.ErrorWithStatus(response.StatusError, "failed to add event"))
-		// 	return
-		// }
-
 		//чтобы не блокировать
 		go h.service.AddEvent(&event, log)
 
 		w.WriteHeader(http.StatusCreated)
 		render.JSON(w, r, response.OK())
+	}
+}
+
+func (h Handler) NewSession() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var fn = "internal.http-server.handlers"
+
+		var req CreateNewSessionRequest
+
+		if err := render.Decode(r, &req); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			render.JSON(w, r, response.ErrorWithStatus(response.StatusBadRequest, "bad request"))
+			return
+		}
+
+		if err := response.ValidateRequest(req); err != nil {
+			validateErr := err.(validator.ValidationErrors)
+			w.WriteHeader(http.StatusBadRequest)
+			render.JSON(w, r, response.ValidateRequest(validateErr))
+			return
+		}
 	}
 }

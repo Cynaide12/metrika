@@ -1,11 +1,13 @@
 package mock
 
 import (
+	crypto "crypto/rand"
 	"fmt"
 	"log/slog"
-	"math/rand"
+	"math/rand/v2"
 	"metrika/internal/models"
 	"metrika/internal/tracker"
+	"sync/atomic"
 	"time"
 )
 
@@ -19,6 +21,7 @@ type Mock struct {
 	minEventInLoop int
 	tracker        *tracker.Tracker
 	closeChan      chan struct{}
+	idsCounter     atomic.Int64
 }
 
 func New(interval time.Duration, randWindow int, log *slog.Logger, bufferSize, maxEventInLoop, minEventInLoop int, tracker *tracker.Tracker) *Mock {
@@ -32,28 +35,47 @@ func New(interval time.Duration, randWindow int, log *slog.Logger, bufferSize, m
 		minEventInLoop,
 		tracker,
 		make(chan struct{}),
+		atomic.Int64{},
 	}
 }
 
-func (m Mock) StartEventsGenerator() {
+func (m *Mock) generateRandomUuid() string {
+	var buf [16]byte
+	//сначала записываем в слайс случайные байты
+	_, err := crypto.Read(buf[:])
+	//если генератор не работает - генерируем свой uuid
+	if err != nil {
+		t := time.Now().UnixMicro()
+		c := m.idsCounter.Add(1)
+		return fmt.Sprintf("%d-%d", t, c)
+	}
+	//преобразуем слайс байтов в шестнадцатеричную строку
+	return fmt.Sprintf("%x", buf[:])
+}
+
+func (m *Mock) generateBucketSize(min, max int) int {
+	return min + rand.IntN(max-min)
+}
+
+func (m *Mock) StartEventsGenerator() {
 	ticker := time.NewTicker(m.interval)
 
-	for {
+	defer func() {
+		if r := recover(); r != nil {
+			m.log.Error("events generator error", slog.Any("err", r))
+		}
+	}()
 
+	for {
 		select {
 		case <-ticker.C:
-			var bucketSize int = rand.Intn(m.maxEventInLoop)
-			for {
-				if bucketSize < m.minEventInLoop {
-					bucketSize = rand.Intn(m.maxEventInLoop)
-				}
-				break
-			}
+			bucketSize := m.generateBucketSize(m.minEventInLoop, m.maxEventInLoop)
+
 			log := m.log.With("bucketSize", bucketSize, "time", time.Now().String())
 			log.Info("начал добавлять события")
-			for i := range bucketSize {
-				UserID := fmt.Sprintf("%d", time.Now().Nanosecond())
-				SessionID := fmt.Sprintf("%d", time.Now().Nanosecond()+i)
+			for range bucketSize {
+				UserID := m.generateRandomUuid()
+				SessionID := m.generateRandomUuid()
 				m.tracker.TrackEvent(models.Event{
 					UserID:    UserID,
 					SessionID: SessionID,
@@ -69,6 +91,6 @@ func (m Mock) StartEventsGenerator() {
 	}
 }
 
-func (m Mock) Stop(){
+func (m *Mock) Stop() {
 	close(m.closeChan)
 }
