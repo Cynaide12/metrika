@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"log/slog"
 	"metrika/internal/models"
 	"metrika/internal/repository"
@@ -13,6 +14,11 @@ type Service struct {
 	repo    *repository.Repository
 	tracker *tracker.Tracker
 }
+
+var (
+	ErrNotFound      = repository.ErrNoRows
+	ErrAlreadyExists = repository.ErrAlreadyExists
+)
 
 func New(repo *repository.Repository, log *slog.Logger, tracker *tracker.Tracker) *Service {
 	return &Service{
@@ -29,30 +35,66 @@ func (s *Service) AddEvent(e *models.Event, log *slog.Logger) {
 }
 
 
-func (s *Service) CreateNewSession(FingerprintID, IPAddress string, domain string, log *slog.Logger) error {
+//* SESSIONS
+func (s *Service) CreateNewSession(FingerprintID, IPAddress string, domainUrl string) (models.UserSession, error) {
 	var fn = "internal.service.NewSession"
 
-	tx := s.repo.WithTx(s.repo.GormDB)
+	logger := s.log.With("fn", fn)
 
-	txStorage := tx.GormDB.Begin()
+	tx := s.repo.GormDB.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
 
+	txStorage := s.repo.WithTx(tx)
+
+	//ищем домен
+	var domain models.Domain
+
+	if err := txStorage.GetDomain(&domain, domainUrl); err != nil {
+		tx.Rollback()
+		if errors.Is(err, repository.ErrNoRows) {
+			return models.UserSession{}, ErrNotFound
+		}
+		logger.Error("ошибка получения домена", sl.Err(err))
+		return models.UserSession{}, err
+	}
 
 	//ищем юзера по переданному отпечатку
-	user, err := s.repo.GetOrCreateUser(FingerprintID)
+	user, err := txStorage.GetOrCreateUser(FingerprintID, domain.ID)
 	if err != nil {
-		s.log.Error("ошибка получения юзера по f_id", sl.Err(err))
-		return err
+		logger.Error("ошибка получения юзера по f_id", sl.Err(err))
+		tx.Rollback()
+		return models.UserSession{}, err
 	}
-
-
 
 	session := models.UserSession{
-		FingerprintID,
-		IPAddress,
+		UserID:    user.ID,
+		IPAddress: IPAddress,
 	}
 
-	if err := s.repo.CreateNewSession(&session); err != nil{
-
+	if err := s.repo.CreateNewSession(&session); err != nil {
+		logger.Error("ошибка создания новой сессии", sl.Err(err))
+		tx.Rollback()
+		return models.UserSession{}, err
 	}
 
+	if err := tx.Commit().Error; err != nil {
+		logger.Error("ошибка выполнения транзакции", sl.Err(err))
+
+		return models.UserSession{}, err
+	}
+
+	return session, nil
 }
+
+
+// func (s *Service) CloseSession(session_id uint) error {
+// 	var fn = "internal.service.CloseSession"
+
+// 	logger := s.log.With("fn", fn)
+
+	
+// }

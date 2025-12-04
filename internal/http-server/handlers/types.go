@@ -8,6 +8,7 @@ import (
 
 type HandlerService interface {
 	AddEvent(e *models.Event, log *slog.Logger)
+	CreateNewSession(FingerprintID, IPAddress string, domainUrl string) (models.UserSession, error)
 }
 
 type AddEventRequest struct {
@@ -23,5 +24,3 @@ type AddEventRequest struct {
 type CreateNewSessionRequest struct {
 	FingerprintID string `json:"f_id"`
 }
-
-

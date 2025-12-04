@@ -23,9 +23,23 @@ func New(log *slog.Logger, service HandlerService, r chi.Router) *Handler {
 		service: service,
 	}
 
+	r.Get("/health", h.Health())
 	r.Post("/api/v1/events", h.AddEvent())
 
 	return h
+}
+
+func (h Handler) Health() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		h.log.Debug("HEADERS", slog.Any("HEADERS", r.Header))
+		h.log.Debug("REMOTEADDR", slog.Any("REMOTEADDR", r.RemoteAddr))
+		h.log.Debug("HOST", slog.Any("HOST", r.Host))
+
+		w.WriteHeader(http.StatusOK)
+
+	}
+
 }
 
 func (h Handler) AddEvent() http.HandlerFunc {
@@ -67,9 +81,12 @@ func (h Handler) AddEvent() http.HandlerFunc {
 	}
 }
 
+// TODO: доделать
 func (h Handler) NewSession() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var fn = "internal.http-server.handlers"
+		// var fn = "internal.http-server.handlers"
+
+		// logger := h.log.With("handlerFn", fn)
 
 		var req CreateNewSessionRequest
 
@@ -85,5 +102,11 @@ func (h Handler) NewSession() http.HandlerFunc {
 			render.JSON(w, r, response.ValidateRequest(validateErr))
 			return
 		}
+
+		// ipAddress := r.Header.Get("X-Real-Ip")
+
+		// if _, err := h.service.CreateNewSession(req.FingerprintID, ipAddress, "test.ru"); err != nil {
+		// 	w.WriteHeader()
+		// }
 	}
 }

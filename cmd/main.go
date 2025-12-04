@@ -5,7 +5,7 @@ import (
 	"metrika/internal/config"
 	"metrika/internal/http-server/handlers"
 	"metrika/internal/logger"
-	"metrika/internal/mock"
+	// "metrika/internal/mock"
 	"metrika/internal/repository"
 	"metrika/internal/service"
 	"metrika/internal/tracker"
@@ -45,10 +45,10 @@ func main() {
 	}
 
 	tracker := tracker.New(1000, time.Second, 10000, storage)
-	mockGenerator := mock.New(time.Second, 1000, log, 2500, 1000000, 5000, tracker)
+	// mockGenerator := mock.New(time.Second, 1000, log, 2500, 1000000, 5000, tracker)
 
 	//генерация моковых данных
-	go mockGenerator.StartEventsGenerator()
+	// go mockGenerator.StartEventsGenerator()
 
 
 	log.Info("db connect succesful")

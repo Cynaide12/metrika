@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"metrika/internal/config"
 	"metrika/internal/models"
@@ -14,6 +15,11 @@ type Repository struct {
 	GormDB *gorm.DB
 	SqlDB  *sql.DB
 }
+
+var (
+	ErrNoRows        = sql.ErrNoRows
+	ErrAlreadyExists = gorm.ErrDuplicatedKey
+)
 
 func New(cfg *config.Config) (*Repository, error) {
 
@@ -75,6 +81,16 @@ func (s *Repository) CreateNewSession(session *models.UserSession) error {
 	return nil
 }
 
+func (s *Repository) CloseUnactiveSessions(maxUnactivePeriod int) error {
+	var fn = "internal.repository.CloseUnactiveSessions"
+
+	if err := s.GormDB.Model(&models.UserSession{}).Where("updated").Error; err != nil {
+		return fmt.Errorf("%s: %w", fn, err)
+	}
+
+	return nil
+}
+
 // *USERS
 
 func (s *Repository) GetOrCreateUser(fingerprint string, domain_id uint) (models.User, error) {
@@ -85,4 +101,33 @@ func (s *Repository) GetOrCreateUser(fingerprint string, domain_id uint) (models
 	}
 
 	return models.User{}, nil
+}
+
+// *DOMAINS
+
+func (s *Repository) GetDomain(domain *models.Domain, domainUrl string) error {
+	var fn = "internal.repository.GetDomain"
+
+	if err := s.GormDB.Model(models.Domain{}).Where("site_url = ?", domainUrl).First(&domain).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrNoRows
+		}
+		return fmt.Errorf("%s: %w", fn, err)
+	}
+
+	return nil
+}
+
+func (s *Repository) AddDomain(domain *models.Domain) error {
+	var fn = "internal.repository.AddDomain"
+
+	if err := s.GormDB.Model(models.Domain{}).Create(&domain).Error; err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return ErrAlreadyExists
+		}
+
+		return fmt.Errorf("%s: %w", fn, err)
+	}
+
+	return nil
 }
