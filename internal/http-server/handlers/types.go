@@ -24,3 +24,8 @@ type AddEventRequest struct {
 type CreateNewSessionRequest struct {
 	FingerprintID string `json:"f_id"`
 }
+
+type CreateNewSessionResponse struct{
+	UserId uint `json:"m_u_id"`
+	SessionId uint `json:"m_s_id"`
+}

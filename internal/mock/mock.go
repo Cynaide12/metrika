@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"math/rand/v2"
 	"metrika/internal/models"
+	"metrika/internal/repository"
 	"metrika/internal/tracker"
 	"sync/atomic"
 	"time"
@@ -22,6 +23,10 @@ type Mock struct {
 	tracker        *tracker.Tracker
 	closeChan      chan struct{}
 	idsCounter     atomic.Int64
+}
+
+type MockService interface {
+	GetDomains(domains *[]models.Domain, opts repository.GetDomainsOptions) error
 }
 
 func New(interval time.Duration, randWindow int, log *slog.Logger, bufferSize, maxEventInLoop, minEventInLoop int, tracker *tracker.Tracker) *Mock {
@@ -85,6 +90,29 @@ func (m *Mock) StartEventsGenerator() {
 				})
 			}
 			log.Info("закончил добавлять события")
+		case <-m.closeChan:
+			return
+		}
+	}
+}
+
+//TODO: доделать, надо сюда передавать список доменов для которых генериться будут юзеры(думаю лучше для одного)
+//TODO: сделать еще функцию генерации сессий, она тоже должна принимать массив id юзеров для которых генерим сессию
+func (m *Mock) StartUsersGenerator() {
+	ticker := time.NewTicker(m.interval)
+
+	defer func() {
+		if r := recover(); r != nil {
+			m.log.Error("events generator error", slog.Any("err", r))
+		}
+	}()
+
+	for{
+		select{
+		case <- ticker.C:
+			user := models.User{
+
+			}
 		case <-m.closeChan:
 			return
 		}

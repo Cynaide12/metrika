@@ -28,14 +28,27 @@ func New(repo *repository.Repository, log *slog.Logger, tracker *tracker.Tracker
 	}
 }
 
+// * EVENTS
 func (s *Service) AddEvent(e *models.Event, log *slog.Logger) {
 	// var fn = "internal.service.AddEvent"
 	// log := s.log.With("session_id", e.SessionID, "user_id", e.UserID, "timestamp", e.Timestamp)
 	s.tracker.TrackEvent(*e)
 }
 
+func (s *Service) GetDomains(domains *[]models.Domain, opts repository.GetDomainsOptions) error {
+	var fn = "internal.service.GetDomains"
 
-//* SESSIONS
+	logger := s.log.With("fn", fn)
+
+	if err := s.repo.GetDomains(domains, opts); err != nil {
+		logger.Error("failed to get domains from db", sl.Err(err))
+		return err
+	}
+
+	return nil
+}
+
+// * SESSIONS
 func (s *Service) CreateNewSession(FingerprintID, IPAddress string, domainUrl string) (models.UserSession, error) {
 	var fn = "internal.service.NewSession"
 
@@ -90,11 +103,9 @@ func (s *Service) CreateNewSession(FingerprintID, IPAddress string, domainUrl st
 	return session, nil
 }
 
-
 // func (s *Service) CloseSession(session_id uint) error {
 // 	var fn = "internal.service.CloseSession"
 
 // 	logger := s.log.With("fn", fn)
 
-	
 // }

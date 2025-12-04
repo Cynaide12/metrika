@@ -44,7 +44,7 @@ func New(cfg *config.Config) (*Repository, error) {
 	}
 
 	//миграции
-	GormDB.AutoMigrate(&models.Event{})
+	GormDB.AutoMigrate(&models.Event{}, &models.Domain{}, &models.User{}, &models.UserSession{})
 
 	return &Repository{
 		GormDB: GormDB,
@@ -104,6 +104,36 @@ func (s *Repository) GetOrCreateUser(fingerprint string, domain_id uint) (models
 }
 
 // *DOMAINS
+
+type GetDomainsOptions struct {
+	limit             *int
+	preload_relations *bool
+	site_url          *string
+}
+
+func (s *Repository) GetDomains(domains *[]models.Domain, opts GetDomainsOptions) error {
+	var fn = "internal.repository.GetDomain"
+
+	query := s.GormDB.Model(&models.Domain{})
+
+	if opts.preload_relations != nil {
+		query = query.Preload("Users")
+	}
+
+	if opts.limit != nil {
+		query = query.Limit(*opts.limit)
+	}
+
+	if opts.site_url != nil {
+		query = query.Where("site_url ILIKE %?%", opts.site_url)
+	}
+
+	if err := query.Find(&domains).Error; err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
+		return fmt.Errorf("%s: %w", fn, err)
+	}
+
+	return nil
+}
 
 func (s *Repository) GetDomain(domain *models.Domain, domainUrl string) error {
 	var fn = "internal.repository.GetDomain"

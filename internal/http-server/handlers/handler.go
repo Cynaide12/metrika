@@ -1,9 +1,12 @@
 package handlers
 
 import (
+	"errors"
 	"log/slog"
 	"metrika/internal/models"
+	"metrika/internal/service"
 	response "metrika/lib/api"
+	"metrika/lib/logger/sl"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -81,12 +84,11 @@ func (h Handler) AddEvent() http.HandlerFunc {
 	}
 }
 
-// TODO: доделать
 func (h Handler) NewSession() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// var fn = "internal.http-server.handlers"
+		var fn = "internal.http-server.handlers.NewSession"
 
-		// logger := h.log.With("handlerFn", fn)
+		logger := h.log.With("handlerFn", fn)
 
 		var req CreateNewSessionRequest
 
@@ -103,10 +105,20 @@ func (h Handler) NewSession() http.HandlerFunc {
 			return
 		}
 
-		// ipAddress := r.Header.Get("X-Real-Ip")
+		ipAddress := r.Header.Get("X-Forwarded-For")
 
-		// if _, err := h.service.CreateNewSession(req.FingerprintID, ipAddress, "test.ru"); err != nil {
-		// 	w.WriteHeader()
-		// }
+		session, err := h.service.CreateNewSession(req.FingerprintID, ipAddress, "test.ru")
+		if err != nil {
+			if errors.Is(err, service.ErrNotFound) {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			logger.Error("ошибка при создании сессии для юзера", sl.Err(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			render.JSON(w, r, response.Error("internal server error"))
+			return
+		}
+
+		render.JSON(w, r, CreateNewSessionResponse{UserId: session.UserID, SessionId: session.ID})
 	}
 }
