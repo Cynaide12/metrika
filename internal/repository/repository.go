@@ -161,3 +161,14 @@ func (s *Repository) AddDomain(domain *models.Domain) error {
 
 	return nil
 }
+
+func (s *Repository) GetCountDomainUsers(domainId uint) (int64, error) {
+	var fn = "internal.repository.GetCountDomainUsers"
+
+	var count int64
+	if err := s.GormDB.Model(&models.User{}).Where("domain_id = ?", domainId).Count(&count).Error; err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return count, fmt.Errorf("%s: %w", fn, err)
+	}
+
+	return count, nil
+}

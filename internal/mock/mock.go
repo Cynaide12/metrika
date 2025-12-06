@@ -23,13 +23,14 @@ type Mock struct {
 	tracker        *tracker.Tracker
 	closeChan      chan struct{}
 	idsCounter     atomic.Int64
+	mockService    MockService
 }
 
 type MockService interface {
 	GetDomains(domains *[]models.Domain, opts repository.GetDomainsOptions) error
 }
 
-func New(interval time.Duration, randWindow int, log *slog.Logger, bufferSize, maxEventInLoop, minEventInLoop int, tracker *tracker.Tracker) *Mock {
+func New(interval time.Duration, randWindow int, log *slog.Logger, bufferSize, maxEventInLoop, minEventInLoop int, tracker *tracker.Tracker, repo repository.Repository) *Mock {
 	return &Mock{
 		interval,
 		randWindow,
@@ -41,6 +42,7 @@ func New(interval time.Duration, randWindow int, log *slog.Logger, bufferSize, m
 		tracker,
 		make(chan struct{}),
 		atomic.Int64{},
+		repo,
 	}
 }
 
@@ -96,8 +98,8 @@ func (m *Mock) StartEventsGenerator() {
 	}
 }
 
-//TODO: доделать, надо сюда передавать список доменов для которых генериться будут юзеры(думаю лучше для одного)
-//TODO: сделать еще функцию генерации сессий, она тоже должна принимать массив id юзеров для которых генерим сессию
+// TODO: доделать, надо сюда передавать список доменов для которых генериться будут юзеры(думаю лучше для одного)
+// TODO: сделать еще функцию генерации сессий, она тоже должна принимать массив id юзеров для которых генерим сессию
 func (m *Mock) StartUsersGenerator() {
 	ticker := time.NewTicker(m.interval)
 
@@ -107,12 +109,10 @@ func (m *Mock) StartUsersGenerator() {
 		}
 	}()
 
-	for{
-		select{
-		case <- ticker.C:
-			user := models.User{
-
-			}
+	for {
+		select {
+		case <-ticker.C:
+			user := models.User{}
 		case <-m.closeChan:
 			return
 		}
