@@ -81,10 +81,22 @@ func (s *Repository) CreateNewSession(session *models.UserSession) error {
 	return nil
 }
 
+
+//TODO:доделать
 func (s *Repository) CloseUnactiveSessions(maxUnactivePeriod int) error {
 	var fn = "internal.repository.CloseUnactiveSessions"
 
 	if err := s.GormDB.Model(&models.UserSession{}).Where("updated").Error; err != nil {
+		return fmt.Errorf("%s: %w", fn, err)
+	}
+
+	return nil
+}
+
+func (s *Repository) AddSessions(sessions *[]models.UserSession) error {
+	var fn = "internal.repository.CloseUnactiveSessions"
+
+	if err := s.GormDB.Model(&models.UserSession{}).Create(&sessions).Error; err != nil{
 		return fmt.Errorf("%s: %w", fn, err)
 	}
 
@@ -102,6 +114,21 @@ func (s *Repository) GetOrCreateUser(fingerprint string, domain_id uint) (models
 
 	return models.User{}, nil
 }
+
+func (s *Repository) AddUsers(users *[]models.User) error {
+	var fn = "internal.repository.AddUsers"
+
+	if err := s.GormDB.Model(&models.User{}).Create(&users).Error; err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return ErrAlreadyExists
+		}
+		return fmt.Errorf("%s: %w", fn, err)
+	}
+
+	return nil
+}
+
+
 
 // *DOMAINS
 
@@ -171,4 +198,24 @@ func (s *Repository) GetCountDomainUsers(domainId uint) (int64, error) {
 	}
 
 	return count, nil
+}
+
+type GetDomainUsersOptions struct {
+	limit *int
+}
+
+func (s *Repository) GetDomainUsers(users *[]models.User, domainId uint, opts GetDomainUsersOptions) error {
+	var fn = "internal.repository.GetCountDomainUsers"
+
+	query := s.GormDB.Model(&models.User{}).Where("domain_id = ?", domainId)
+
+	if opts.limit != nil {
+		query = query.Limit(*opts.limit)
+	}
+
+	if err := query.Find(&users).Error; err != nil {
+		return fmt.Errorf("%s: %w", fn, err)
+	}
+
+	return nil
 }

@@ -68,7 +68,6 @@ func (h Handler) AddEvent() http.HandlerFunc {
 
 		event := models.Event{
 			SessionID: req.SessionID,
-			UserID:    req.UserID,
 			Element:   req.Element,
 			// Data:      req.Data,
 			Type:      req.Type,

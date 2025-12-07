@@ -12,9 +12,8 @@ type HandlerService interface {
 }
 
 type AddEventRequest struct {
-	SessionID string                 `json:"session_id" validate:"required"`
+	SessionID uint                 `json:"session_id" validate:"required"`
 	Type      string                 `json:"type" validate:"required"`
-	UserID    string                 `json:"user_id" validate:"required"`
 	PageURL   string                 `json:"page_url" validate:"required"`
 	Element   string                 `json:"element"`
 	Timestamp time.Time              `json:"timestamp"`

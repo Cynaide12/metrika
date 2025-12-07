@@ -10,32 +10,44 @@ import (
 )
 
 type Config struct {
-    Env                       string     `yaml:"env" env-default:"local" env-required:"true" env:"ENV"`
-    LogFilePath               string     `yaml:"log_file_path" env-required:"true" env-default:".logs/apm_server.log" env:"LOG_FILE_PATH"`
-    JWTSecret                 string     `yaml:"jwt_secret" env-required:"true" env:"JWT_SECRET"`
-    MaxRequestSize            int        `yaml:"max_request_size" env-default:"64" env:"MAX_REQUEST_SIZE"`
-    FilesStoragePath          string     `yaml:"files_storage_path" env-default:"./var/uploads" env:"FILES_STORAGE_PATH"`
-    AllowedFilesExtensionsRaw string     `yaml:"allowed_file_extensions" env:"ALLOWED_FILES_EXTENSIONS_RAW"`
-    AllowedFilesExtension     []string   //парсится в MustLoad
-    MaxFileSize               int64      `yaml:"max_file_size" env-default:"20" env:"MAX_FILE_SIZE"`
-    HTTPServer                HTTPServer `yaml:"http_server"`
-    DBServer                  DBServer   `yaml:"db_server"`
-    // SMTPServer                SMTPServer `yaml:"smtp_server"`
-    Frontend                  Frontend   `yaml:"frontend"`
+	Env                       string        `yaml:"env" env-default:"local" env-required:"true" env:"ENV"`
+	LogFilePath               string        `yaml:"log_file_path" env-required:"true" env-default:".logs/apm_server.log" env:"LOG_FILE_PATH"`
+	JWTSecret                 string        `yaml:"jwt_secret" env-required:"true" env:"JWT_SECRET"`
+	MaxRequestSize            int           `yaml:"max_request_size" env-default:"64" env:"MAX_REQUEST_SIZE"`
+	FilesStoragePath          string        `yaml:"files_storage_path" env-default:"./var/uploads" env:"FILES_STORAGE_PATH"`
+	AllowedFilesExtensionsRaw string        `yaml:"allowed_file_extensions" env:"ALLOWED_FILES_EXTENSIONS_RAW"`
+	AllowedFilesExtension     []string      //парсится в MustLoad
+	MaxFileSize               int64         `yaml:"max_file_size" env-default:"20" env:"MAX_FILE_SIZE"`
+	HTTPServer                HTTPServer    `yaml:"http_server"`
+	DBServer                  DBServer      `yaml:"db_server"`
+	MockConfig                MockGenerator `yamp:"mock_generator"`
+	// SMTPServer                SMTPServer `yaml:"smtp_server"`
+	Frontend Frontend `yaml:"frontend"`
 }
 
 type HTTPServer struct {
-    Address     string        `yaml:"address" env-default:"localhost:8080" env:"HTTP_SERVER_ADDRESS"`
-    Timeout     time.Duration `yaml:"timeout" env-default:"4s" env:"HTTP_SERVER_TIMEOUT"`
-    IdleTimeout time.Duration `yaml:"idle_timeout" env-default:"60s" env:"HTTP_SERVER_IDLE_TIMEOUT"`
+	Address     string        `yaml:"address" env-default:"localhost:8080" env:"HTTP_SERVER_ADDRESS"`
+	Timeout     time.Duration `yaml:"timeout" env-default:"4s" env:"HTTP_SERVER_TIMEOUT"`
+	IdleTimeout time.Duration `yaml:"idle_timeout" env-default:"60s" env:"HTTP_SERVER_IDLE_TIMEOUT"`
 }
 
 type DBServer struct {
-    Host     string `yaml:"host" env-required:"true" env-default:"localhost" env:"DB_HOST"`
-    Port     int    `yaml:"port" env-required:"true" env-default:"5432" env:"DB_PORT"`
-    Username string `yaml:"username" env-required:"true" env-default:"postgres" env:"DB_USERNAME"`
-    Password string `yaml:"password" env-required:"true" env-default:"root" env:"DB_PASSWORD"`
-    DBName   string `yaml:"db_name" env-required:"true" env:"DB_NAME"`
+	Host     string `yaml:"host" env-required:"true" env-default:"localhost" env:"DB_HOST"`
+	Port     int    `yaml:"port" env-required:"true" env-default:"5432" env:"DB_PORT"`
+	Username string `yaml:"username" env-required:"true" env-default:"postgres" env:"DB_USERNAME"`
+	Password string `yaml:"password" env-required:"true" env-default:"root" env:"DB_PASSWORD"`
+	DBName   string `yaml:"db_name" env-required:"true" env:"DB_NAME"`
+}
+
+type MockGenerator struct {
+	//раз в сколько секунд будет генерироваться пачка ивентов моковых
+	RandWindowSecond int `yaml:"rand_window_second" env-default:"2" env:"RAND_WINDOW_SECOND"`
+	BufferSize       int `yaml:"buffer_size" env-default:"10000" env:"BUFFERSIZE"` //TODO: для чего это я указывал ваще?
+	// максимальное кол-во ивентов, генерируемых за 1 итерацию
+	MaxEventInLoop int `yaml:"max_event_in_loop" env-default:"10000" env:"MAX_EVENT_IN_LOOP"`
+	// минимальное+ кол-во ивентов, генерируемых за 1 итерацию
+	MinEventInLoop       int   `yaml:"min_event_in_loop"  env-default:"2500" env:"MIN_EVENT_IN_LOOP"`
+	MaxMockUsersInDomain int64 `yaml:"max_mock_users_in_domain"  env-default:"100" env:"MAX_MOCK_USERS_IN_DOMAIN"`
 }
 
 // type SMTPServer struct {
@@ -47,9 +59,8 @@ type DBServer struct {
 // }
 
 type Frontend struct {
-    AppUrl string `yaml:"app_url" env-required:"true" env:"FRONTEND_APP_URL"`
+	AppUrl string `yaml:"app_url" env-required:"true" env:"FRONTEND_APP_URL"`
 }
-
 
 func MustLoad() *Config {
 	configPath := os.Getenv("CONFIG_PATH")

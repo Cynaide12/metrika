@@ -12,9 +12,8 @@ type Model struct {
 
 type Event struct {
 	Model
-	SessionID string    `gorm:"column:session_id;NOT NULL"`
+	SessionID uint      `gorm:"column:session_id;NOT NULL"`
 	Type      string    `gorm:"column:type;NOT NULL"`
-	UserID    string    `gorm:"column:user_id;NOT NULL"`
 	PageURL   string    `gorm:"column:page_url;NOT NULL"`
 	Element   string    `gorm:"column:element;NOT NULL"`
 	Timestamp time.Time `gorm:"column:timestamp;NOT NULL"`
