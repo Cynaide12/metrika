@@ -161,6 +161,12 @@ func (m MockService) StartEventsGenerator() {
 				//отправляем на обработку
 				go m.tracker.TrackEvent(*event)
 			}
+		case <-m.closeChan:
+			return 
 		}
 	}
+}
+
+func (m MockService) StopEventsGenerator(){
+	close(m.closeChan)
 }
