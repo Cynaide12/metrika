@@ -6,8 +6,8 @@ import (
 	"metrika/internal/http-server/handlers"
 	"metrika/internal/logger"
 	"metrika/internal/mock"
+	worker "metrika/internal/workers"
 
-	// "metrika/internal/mock"
 	"metrika/internal/repository"
 	"metrika/internal/service"
 	"metrika/internal/tracker"
@@ -46,18 +46,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	tracker := tracker.New(1000, time.Second, 10000, storage)
-	
-	mockGenerator := mock.NewGenerator()
+	tracker := tracker.New(1000, time.Minute * 15, 10000, storage)
 
-	mockService := service.NewMockService(storage, mockGenerator, log, tracker, cfg.MockConfig)
-	
-	go mockService.StartEventsGenerator()
+	sessions_worker := worker.NewSessionsWorker(log, storage, time.Second*15)
 
+	go sessions_worker.StartSessionManager()
 
-	//генерация моковых данных
-	// go mockGenerator.StartEventsGenerator()
-
+	setupMockGenerator(storage, log, tracker, cfg)
 
 	log.Info("db connect succesful")
 
@@ -66,6 +61,13 @@ func main() {
 	initRouter(cfg, log, storage, tracker)
 }
 
+func setupMockGenerator(storage *repository.Repository, log *slog.Logger, tracker *tracker.Tracker, cfg *config.Config) {
+	mockGenerator := mock.NewGenerator()
+
+	mockService := service.NewMockService(storage, mockGenerator, log, tracker, cfg.MockConfig)
+
+	go mockService.StartEventsGenerator()
+}
 
 func setupLogRotation(rotate func()) {
 	//запускаем ротацию логов каждые сутки

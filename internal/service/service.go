@@ -30,8 +30,6 @@ func New(repo *repository.Repository, log *slog.Logger, tracker *tracker.Tracker
 
 // * EVENTS
 func (s *Service) AddEvent(e *models.Event, log *slog.Logger) {
-	// var fn = "internal.service.AddEvent"
-	// log := s.log.With("session_id", e.SessionID, "user_id", e.UserID, "timestamp", e.Timestamp)
 	s.tracker.TrackEvent(*e)
 }
 

@@ -35,7 +35,9 @@ type User struct {
 
 type UserSession struct {
 	Model
-	UserID    uint   `gorm:"column:user_id;NOT NULL" json:"user_id"`
-	IPAddress string `gorm:"column:ip_address;NOT NULL" json:"ip_address"`
-	Active    bool   `gorm:"column:active;NOT NULL;default:false"`
+	UserID     uint      `gorm:"column:user_id;NOT NULL" json:"user_id"`
+	IPAddress  string    `gorm:"column:ip_address;NOT NULL" json:"ip_address"`
+	Active     bool      `gorm:"column:active;NOT NULL;default:false"`
+	EndTime    time.Time `gorm:"end_time"`
+	LastActive time.Time `gorm:"column:last_active;NOT NULL;default:CURRENT_TIMESTAMP"`
 }

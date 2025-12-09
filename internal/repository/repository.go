@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"metrika/internal/config"
 	"metrika/internal/models"
+	"time"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -63,11 +64,30 @@ func (s *Repository) WithTx(tx *gorm.DB) *Repository {
 func (s *Repository) SaveEvents(events []models.Event) error {
 	var fn = "internal.repository.SaveEvent"
 
-	if err := s.GormDB.Model(&models.Event{}).Create(&events).Error; err != nil {
+	tx := s.GormDB.Begin()
+
+	defer func() {
+		if err := recover(); err != nil {
+			tx.Rollback()
+		}
+	}()
+
+	if err := tx.Model(&models.Event{}).Create(&events).Error; err != nil {
+		tx.Rollback()
 		return fmt.Errorf("%s: %w", fn, err)
 	}
 
-	return nil
+	var eventIds []uint
+	for _, event := range events {
+		eventIds = append(eventIds, event.ID)
+	}
+
+	if err := tx.Model(&models.UserSession{}).Where("active = true AND id IN ?", eventIds).Updates(&models.UserSession{LastActive: time.Now()}).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("%s: %w", fn, err)
+	}
+
+	return tx.Commit().Error
 }
 
 // *SESSIONS
@@ -81,18 +101,50 @@ func (s *Repository) CreateNewSession(session *models.UserSession) error {
 	return nil
 }
 
-//TODO: доделать
-func (s Repository) GetActiveSessions(sessions *[]models.UserSession,limit int)  error{
+func (s Repository) GetActiveSessions(sessions *[]models.UserSession, limit int) error {
 	var fn = "internal.repository.GetActiveSessions"
 
-	if err := s.GormDB.Model(&models.UserSession{}).Limit(limit).Find(sessions)
+	if err := s.GormDB.Model(&models.UserSession{}).Limit(limit).Find(sessions).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrNoRows
+		}
+		return fmt.Errorf("%s: %s", fn, err)
+	}
+	return nil
+}
 
+func (s Repository) GetStaleSessions(limit int) ([]models.UserSession, error) {
+	var fn = "internal.repository.GetStaleSessions"
+
+	var sessions []models.UserSession
+
+	if err := s.GormDB.Raw(`
+	SELECT s.id, s.last_active FROM user_sessions s WHERE s.active = true AND s.last_active < NOW() - INTERVAL  '25 minutes'
+	AND NOT EXISTS 
+	(SELECT 1 FROM events e WHERE e.session_id=s.id AND e.timestamp > NOW() - INTERVAL '30 minutes') 
+	LIMIT $1
+	`, limit).Scan(&sessions).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return sessions, ErrNoRows
+		}
+		return sessions, fmt.Errorf("%s: %s", fn, err)
+	}
+	return sessions, nil
+}
+
+func (s *Repository) CloseSession(session_ids []uint) error{
+	var fn = "internal.repository.GetStaleSessions"
+
+	if err := s.GormDB.Exec("UPDATE user_sessions SET active = false, end_time = NOW() WHERE id = ANY($1)", session_ids).Error; err != nil{
+		return fmt.Errorf("%s: %w", fn, err)
+	}
+	return nil
 }
 
 func (s *Repository) AddSessions(sessions *[]models.UserSession) error {
-	var fn = "internal.repository.CloseUnactiveSessions"
+	var fn = "internal.repository.AddSessions"
 
-	if err := s.GormDB.Model(&models.UserSession{}).Create(&sessions).Error; err != nil{
+	if err := s.GormDB.Model(&models.UserSession{}).Create(&sessions).Error; err != nil {
 		return fmt.Errorf("%s: %w", fn, err)
 	}
 
@@ -102,7 +154,7 @@ func (s *Repository) AddSessions(sessions *[]models.UserSession) error {
 // *USERS
 
 func (s *Repository) GetOrCreateUser(fingerprint string, domain_id uint) (models.User, error) {
-	var fn = "internal.repository.GetUserByFingerprint"
+	var fn = "internal.repository.GetOrCreateUser"
 
 	if err := s.GormDB.Model(&models.UserSession{}).Where("f_id = ?", fingerprint).FirstOrCreate(&models.User{Fingerprint: fingerprint, DomainID: domain_id}).Error; err != nil {
 		return models.User{}, fmt.Errorf("%s: %w", fn, err)
@@ -123,8 +175,6 @@ func (s *Repository) AddUsers(users *[]models.User) error {
 
 	return nil
 }
-
-
 
 // *DOMAINS
 
