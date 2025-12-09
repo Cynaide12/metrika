@@ -81,16 +81,12 @@ func (s *Repository) CreateNewSession(session *models.UserSession) error {
 	return nil
 }
 
+//TODO: доделать
+func (s Repository) GetActiveSessions(sessions *[]models.UserSession,limit int)  error{
+	var fn = "internal.repository.GetActiveSessions"
 
-//TODO:доделать
-func (s *Repository) CloseUnactiveSessions(maxUnactivePeriod int) error {
-	var fn = "internal.repository.CloseUnactiveSessions"
+	if err := s.GormDB.Model(&models.UserSession{}).Limit(limit).Find(sessions)
 
-	if err := s.GormDB.Model(&models.UserSession{}).Where("updated").Error; err != nil {
-		return fmt.Errorf("%s: %w", fn, err)
-	}
-
-	return nil
 }
 
 func (s *Repository) AddSessions(sessions *[]models.UserSession) error {

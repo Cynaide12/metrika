@@ -38,7 +38,7 @@ func NewMockService(repo *repository.Repository, generator *mock.Generator, log 
 
 	mockDomainId, mockUsersIds, mockSessionIds, err := m.seedMockData()
 	if err != nil {
-		panic(fmt.Sprintf("ошибка при инициализации моковых данных"))
+		panic("ошибка при инициализации моковых данных")
 	}
 
 	m.mockDomainId = mockDomainId
@@ -166,6 +166,7 @@ func (m MockService) StartEventsGenerator() {
 		}
 	}
 }
+
 
 func (m MockService) StopEventsGenerator(){
 	close(m.closeChan)
