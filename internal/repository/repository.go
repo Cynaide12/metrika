@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"metrika/internal/config"
 	"metrika/internal/models"
 	"time"
@@ -156,11 +157,15 @@ func (s *Repository) AddSessions(sessions *[]models.UserSession) error {
 func (s *Repository) GetOrCreateUser(fingerprint string, domain_id uint) (models.User, error) {
 	var fn = "internal.repository.GetOrCreateUser"
 
-	if err := s.GormDB.Model(&models.UserSession{}).Where("f_id = ?", fingerprint).FirstOrCreate(&models.User{Fingerprint: fingerprint, DomainID: domain_id}).Error; err != nil {
+	user := models.User{Fingerprint: fingerprint, DomainID: domain_id}
+
+	if err := s.GormDB.Model(&models.User{}).Where("f_id = ?", fingerprint).FirstOrCreate(&user).Error; err != nil {
 		return models.User{}, fmt.Errorf("%s: %w", fn, err)
 	}
 
-	return models.User{}, nil
+	log.Println("USER", user.ID)
+
+	return user, nil
 }
 
 func (s *Repository) AddUsers(users *[]models.User) error {

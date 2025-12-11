@@ -28,7 +28,6 @@ func (s SessionsWorker) StartSessionManager() {
 	ticker := time.NewTicker(s.interval)
 
 	for range ticker.C {
-		s.log.Debug("НАЧИНАЮ ЧИСТИТЬ СЕССИИ")
 		go func() {
 			if err := s.cleanupBatchSessions(10); err != nil {
 				logger.Error("ошибка при закрытии устаревших сессий", sl.Err(err))
@@ -71,7 +70,6 @@ func (s SessionsWorker) cleanupBatchSessions(limit int) error {
 		return err
 	}
 
-	s.log.Debug("ПОЧИЩЕНО СЕССИЙ", slog.Int("колво", int(len(session_ids))))
 
 	return tx.Commit().Error
 }

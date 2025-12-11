@@ -28,6 +28,7 @@ func New(log *slog.Logger, service HandlerService, r chi.Router) *Handler {
 
 	r.Get("/health", h.Health())
 	r.Post("/api/v1/events", h.AddEvent())
+	r.Post("/api/v1/sessions", h.NewSession())
 
 	return h
 }
@@ -51,9 +52,10 @@ func (h Handler) AddEvent() http.HandlerFunc {
 
 		log := h.log.With("fn", fn)
 
-		var req AddEventRequest
+		var req AddEventsRequest
 
 		if err := render.Decode(r, &req); err != nil {
+			log.Error("unable to decode request", sl.Err(err))
 			w.WriteHeader(http.StatusBadRequest)
 			render.JSON(w, r, response.ErrorWithStatus(response.StatusBadRequest, "bad request"))
 			return
@@ -66,17 +68,18 @@ func (h Handler) AddEvent() http.HandlerFunc {
 			return
 		}
 
-		event := models.Event{
-			SessionID: req.SessionID,
-			Element:   req.Element,
-			// Data:      req.Data,
-			Type:      req.Type,
-			Timestamp: req.Timestamp,
-			PageURL:   req.PageURL,
+		for _, reqEvent := range req.Events {
+			event := models.Event{
+				SessionID: reqEvent.SessionID,
+				Element:   reqEvent.Element,
+				// Data:      req.Data,
+				Type:      reqEvent.Type,
+				Timestamp: reqEvent.Timestamp,
+				PageURL:   reqEvent.PageURL,
+			}
+			//чтобы не блокировать
+			go h.service.AddEvent(&event, log)
 		}
-
-		//чтобы не блокировать
-		go h.service.AddEvent(&event, log)
 
 		w.WriteHeader(http.StatusCreated)
 		render.JSON(w, r, response.OK())
@@ -92,6 +95,7 @@ func (h Handler) NewSession() http.HandlerFunc {
 		var req CreateNewSessionRequest
 
 		if err := render.Decode(r, &req); err != nil {
+			h.log.Error("unable to decode request", sl.Err(err))
 			w.WriteHeader(http.StatusBadRequest)
 			render.JSON(w, r, response.ErrorWithStatus(response.StatusBadRequest, "bad request"))
 			return

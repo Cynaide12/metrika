@@ -1,6 +1,7 @@
 package tracker
 
 import (
+	"log"
 	"metrika/internal/models"
 	"time"
 )
@@ -46,6 +47,7 @@ func (r *Tracker) saver() {
 			}
 		case <-ticker.C:
 			if len(batch) > 0{
+				log.Println("СОХРАНЯЮ ИВЕНТ")
 			r.handler.SaveEvents(batch)
 			batch = batch[:0]
 			}

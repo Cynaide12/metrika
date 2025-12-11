@@ -3,7 +3,7 @@ log_file_path: "./logs/metrika.log" #путь для хранения логов
 jwt_secret: "1312312321asdzfsdf3245[uq3878ogdfio0yp9q3y8725yosdfopigjqh8346rt712q835t&^O@#&$%YWEPFID]" #соль для генерации jwt токена
 max_request_size: 256
 http_server:
-  address: ":8080"
+  address: ":8081"
   timeout: 4s
   idle_timeout: 60s
 db_server: #параметры для соединения с базой данных

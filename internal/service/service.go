@@ -52,20 +52,10 @@ func (s *Service) CreateNewSession(FingerprintID, IPAddress string, domainUrl st
 
 	logger := s.log.With("fn", fn)
 
-	tx := s.repo.GormDB.Begin()
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
-
-	txStorage := s.repo.WithTx(tx)
-
 	//ищем домен
 	var domain models.Domain
 
-	if err := txStorage.GetDomain(&domain, domainUrl); err != nil {
-		tx.Rollback()
+	if err := s.repo.GetDomain(&domain, domainUrl); err != nil {
 		if errors.Is(err, repository.ErrNoRows) {
 			return models.UserSession{}, ErrNotFound
 		}
@@ -73,28 +63,23 @@ func (s *Service) CreateNewSession(FingerprintID, IPAddress string, domainUrl st
 		return models.UserSession{}, err
 	}
 
+	//TODO: почему то в экземпляр юзера не записывается ID чекнуть в репозитории че как и в дебаг вывести
+
 	//ищем юзера по переданному отпечатку
-	user, err := txStorage.GetOrCreateUser(FingerprintID, domain.ID)
+	user, err := s.repo.GetOrCreateUser(FingerprintID, domain.ID)
 	if err != nil {
 		logger.Error("ошибка получения юзера по f_id", sl.Err(err))
-		tx.Rollback()
 		return models.UserSession{}, err
 	}
 
 	session := models.UserSession{
 		UserID:    user.ID,
 		IPAddress: IPAddress,
+		EndTime:   nil,
 	}
 
 	if err := s.repo.CreateNewSession(&session); err != nil {
 		logger.Error("ошибка создания новой сессии", sl.Err(err))
-		tx.Rollback()
-		return models.UserSession{}, err
-	}
-
-	if err := tx.Commit().Error; err != nil {
-		logger.Error("ошибка выполнения транзакции", sl.Err(err))
-
 		return models.UserSession{}, err
 	}
 

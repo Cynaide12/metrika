@@ -30,7 +30,7 @@ type User struct {
 	Model
 	DomainID    uint          `gorm:"column:domain_id;NOT NULL"`
 	Fingerprint string        `gorm:"column:f_id" json:"f_id"`
-	Sessions    []UserSession `gorm:"foreignkey:UserID;constraint:OnDelete:CASCADE" json:"sessions;omitempty"`
+	Sessions    []UserSession `gorm:"foreignkey:UserID;constraint:OnDelete:CASCADE" json:"sessions,omitempty"`
 }
 
 type UserSession struct {
@@ -38,6 +38,6 @@ type UserSession struct {
 	UserID     uint      `gorm:"column:user_id;NOT NULL" json:"user_id"`
 	IPAddress  string    `gorm:"column:ip_address;NOT NULL" json:"ip_address"`
 	Active     bool      `gorm:"column:active;NOT NULL;default:false"`
-	EndTime    time.Time `gorm:"end_time"`
+	EndTime    *time.Time `gorm:"column:end_time;default:NULL"`
 	LastActive time.Time `gorm:"column:last_active;NOT NULL;default:CURRENT_TIMESTAMP"`
 }

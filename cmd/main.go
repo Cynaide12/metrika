@@ -46,13 +46,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	tracker := tracker.New(1000, time.Minute * 15, 10000, storage)
+	tracker := tracker.New(1000, time.Second * 15, 10000, storage)
 
 	sessions_worker := worker.NewSessionsWorker(log, storage, time.Second*15)
 
 	go sessions_worker.StartSessionManager()
 
-	setupMockGenerator(storage, log, tracker, cfg)
+	// setupMockGenerator(storage, log, tracker, cfg)
 
 	log.Info("db connect succesful")
 
