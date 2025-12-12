@@ -3315,24 +3315,39 @@ components: ${componentsToDebugString(components)}
 
 class Metrika {
   constructor(options) {
-    this.baseUrl = options.baseUrl;
-    const s = this.getSession();
-    this.sessionId = s.sessionId;
-    this.userId = s.userId;
-    this.queue = [];
-    this.flushInterval = setInterval(() => this.flush(), 5000);
+    return (async () => {
+      this.baseUrl = options.baseUrl;
+      const s = await this.getSession();
+      this.sessionId = s.sessionId;
+      this.userId = s.userId;
+      this.queue = [];
+      this.flushInterval = setInterval(() => this.flush(), 5000);
+      this.setupSPATracking();
+      return this;
+    })();
   }
 
   async getSession() {
-    const fp = await this.getFp();
-    const res = await fetch(`${this.baseUrl}/sessions`, {
-      method: 'POST',
-      body: JSON.stringify({ f_id: fp }),
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    }).then((res) => res.json());
-    return { sessionId: res?.data?.m_u_id, userId: res?.data?.m_s_id };
+    const data = {
+      userId: +localStorage.getItem('m_u_id'),
+      sessionId: +localStorage.getItem('m_s_id'),
+    };
+
+    if (!data.userId || !data.sessionId) {
+      const fp = await this.getFp();
+      const res = await fetch(`${this.baseUrl}/sessions`, {
+        method: 'POST',
+        body: JSON.stringify({ f_id: fp }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }).then((res) => res.json());
+      data.sessionId = res.m_s_id;
+      data.userId = res.m_u_id;
+      localStorage.setItem('m_u_id', data.userId);
+      localStorage.setItem('m_s_id', data.sessionId);
+    }
+    return data;
   }
 
   async Track(eventType, data) {
@@ -3357,7 +3372,7 @@ class Metrika {
   }
 
   async flush() {
-    if (this.queue.length == 0) return;
+    if (this.queue.length == 0 || !this.sessionId) return;
 
     await fetch(`${this.baseUrl}/events`, {
       keepalive: true,
@@ -3369,11 +3384,106 @@ class Metrika {
     });
     this.queue = [];
   }
+
+  trackPageView() {
+    this.Track('pageview', {
+      referrer: document.referrer,
+      title: document.title,
+      load_time: performance.now(),
+    });
+  }
+
+  setupSPATracking() {
+    const originalPushState = history.pushState;
+    const originalReplaceState = history.replaceState;
+
+    history.pushState = function (...args) {
+      originalPushState.apply(this, args);
+      window.dispatchEvent(new Event('locationchange'));
+    };
+
+    history.replaceState = function (...args) {
+      originalReplaceState.apply(this, args);
+      window.dispatchEvent(new Event('locationchange'));
+    };
+
+    window.addEventListener('popstate', () => {
+      window.dispatchEvent(new Event('locationchange'));
+    });
+
+    window.addEventListener('locationchange', () => {
+      this.trackPageView();
+    });
+  }
 }
 
-mm = new Metrika({ baseUrl: 'http://localhost:8081/api/v1' });
+const setupBtnListeners = () => {
+  const btns = document.querySelectorAll('button');
 
-// for(let i = 0; i < 10000; i++){
-//   mm.Track('test', {"test": "123123"})
-// }
+  for (let btn of btns) {
+    btn.addEventListener('click', (e) => {
+      console.log(e);
+    });
+  }
+};
 
+const getElementSelector = (element) => {
+  if (element.id) return `#${element.id}`;
+
+  const path = [];
+  let current = element;
+
+  while (current && current !== document.body) {
+    let selector = current.tagName.toLowerCase();
+
+    if (current.className && typeof current.className === 'string') {
+      selector += '.' + current.className.trim().split(/\s+/).join('.');
+    }
+
+    const siblings = Array.from(current.parentNode.children);
+    const index = siblings.indexOf(current) + 1;
+    if (index > 1) selector += `:nth-child(${index})`;
+
+    path.unshift(selector);
+    current = current.parentNode;
+  }
+
+  return path.join(' > ');
+};
+
+const setupListeners = async () => {
+  const mm = await new Metrika({ baseUrl: 'http://localhost:8081/api/v1' });
+
+  setupBtnListeners();
+  window.onsubmit = (t, e) => {
+    console.log(t);
+    console.log(e);
+  };
+
+  window.addEventListener('locationchange', () => {
+    mm.Track();
+  });
+
+  document.addEventListener('click', (e) => {
+    const element = e.target;
+    const selector = getElementSelector(element);
+
+    mm.Track('click', {
+      selector: selector,
+      tag: element.tagName,
+      text: element.textContent.substring(0, 100),
+      x: e.clientX,
+      y: e.clientY,
+      page_x: e.pageX,
+      page_y: e.pageY,
+    });
+  });
+  document.addEventListener('visibilitychange', () => {
+    mm.Track('visibility_change', {
+      state: document.visibilityState,
+      hidden: document.hidden,
+    });
+  });
+};
+
+setupListeners();
