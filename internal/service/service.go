@@ -7,6 +7,7 @@ import (
 	"metrika/internal/repository"
 	"metrika/internal/tracker"
 	"metrika/lib/logger/sl"
+	"time"
 )
 
 type Service struct {
@@ -63,8 +64,6 @@ func (s *Service) CreateNewSession(FingerprintID, IPAddress string, domainUrl st
 		return models.UserSession{}, err
 	}
 
-	//TODO: почему то в экземпляр юзера не записывается ID чекнуть в репозитории че как и в дебаг вывести
-
 	//ищем юзера по переданному отпечатку
 	user, err := s.repo.GetOrCreateUser(FingerprintID, domain.ID)
 	if err != nil {
@@ -73,9 +72,11 @@ func (s *Service) CreateNewSession(FingerprintID, IPAddress string, domainUrl st
 	}
 
 	session := models.UserSession{
-		UserID:    user.ID,
-		IPAddress: IPAddress,
-		EndTime:   nil,
+		UserID:     user.ID,
+		IPAddress:  IPAddress,
+		EndTime:    nil,
+		Active:     true,
+		LastActive: time.Now(),
 	}
 
 	if err := s.repo.CreateNewSession(&session); err != nil {
@@ -84,6 +85,21 @@ func (s *Service) CreateNewSession(FingerprintID, IPAddress string, domainUrl st
 	}
 
 	return session, nil
+}
+
+// *INFO
+func (s *Service) GetCountActiveSessions(domain_id uint) (int64, error) {
+	var fn = "internal.service.GetCountActiveSessions"
+
+	logger := s.log.With("fn", fn)
+
+	count, err := s.repo.GetCountActiveSessions(domain_id)
+	if err != nil {
+		logger.Error("failed to get active sessions from db", sl.Err(err))
+		return 0, err
+	}
+
+	return count, nil
 }
 
 // func (s *Service) CloseSession(session_id uint) error {

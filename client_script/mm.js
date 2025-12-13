@@ -3352,10 +3352,9 @@ class Metrika {
 
   async Track(eventType, data) {
     this.queue.push({
-      sessionId: this.sessionId,
+      session_id: this.sessionId,
       type: eventType,
-      page_ur: window.location.pathname,
-      element: 'test',
+      page_url: window.location.pathname,
       data: data,
       timestamp: new Date(Date.now()),
       url: window.location.href,
@@ -3417,16 +3416,6 @@ class Metrika {
   }
 }
 
-const setupBtnListeners = () => {
-  const btns = document.querySelectorAll('button');
-
-  for (let btn of btns) {
-    btn.addEventListener('click', (e) => {
-      console.log(e);
-    });
-  }
-};
-
 const getElementSelector = (element) => {
   if (element.id) return `#${element.id}`;
 
@@ -3454,16 +3443,6 @@ const getElementSelector = (element) => {
 const setupListeners = async () => {
   const mm = await new Metrika({ baseUrl: 'http://localhost:8081/api/v1' });
 
-  setupBtnListeners();
-  window.onsubmit = (t, e) => {
-    console.log(t);
-    console.log(e);
-  };
-
-  window.addEventListener('locationchange', () => {
-    mm.Track();
-  });
-
   document.addEventListener('click', (e) => {
     const element = e.target;
     const selector = getElementSelector(element);
@@ -3478,12 +3457,34 @@ const setupListeners = async () => {
       page_y: e.pageY,
     });
   });
+
   document.addEventListener('visibilitychange', () => {
     mm.Track('visibility_change', {
       state: document.visibilityState,
       hidden: document.hidden,
     });
   });
+
+  window.onload = () => {
+    mm.Track("open_site")
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    mm.Track("open_site")
+  })
+
+  document.addEventListener(
+    'submit',
+    (e) => {
+      const form = e.target;
+      mm.Track('form_submit', {
+        form_id: form.id || 'unknown',
+        form_action: form.action,
+        field_count: form.elements.length,
+      });
+    },
+    true
+  );
 };
 
 setupListeners();

@@ -9,6 +9,7 @@ import (
 type HandlerService interface {
 	AddEvent(e *models.Event, log *slog.Logger)
 	CreateNewSession(FingerprintID, IPAddress string, domainUrl string) (models.UserSession, error)
+	GetCountActiveSessions(domain_id uint) (int64, error) 
 }
 
 type AddEventsRequest struct{
@@ -31,4 +32,8 @@ type CreateNewSessionRequest struct {
 type CreateNewSessionResponse struct {
 	UserId    uint `json:"m_u_id"`
 	SessionId uint `json:"m_s_id"`
+}
+
+type GetCountActiveSessionsResponse struct {
+	Count int64 `json:"count"`
 }

@@ -80,7 +80,7 @@ func (s *Repository) SaveEvents(events []models.Event) error {
 
 	var eventIds []uint
 	for _, event := range events {
-		eventIds = append(eventIds, event.ID)
+		eventIds = append(eventIds, event.SessionID)
 	}
 
 	if err := tx.Model(&models.UserSession{}).Where("active = true AND id IN ?", eventIds).Updates(&models.UserSession{LastActive: time.Now()}).Error; err != nil {
@@ -133,10 +133,10 @@ func (s Repository) GetStaleSessions(limit int) ([]models.UserSession, error) {
 	return sessions, nil
 }
 
-func (s *Repository) CloseSession(session_ids []uint) error{
+func (s *Repository) CloseSession(session_ids []uint) error {
 	var fn = "internal.repository.GetStaleSessions"
 
-	if err := s.GormDB.Exec("UPDATE user_sessions SET active = false, end_time = NOW() WHERE id = ANY($1)", session_ids).Error; err != nil{
+	if err := s.GormDB.Exec("UPDATE user_sessions SET active = false, end_time = NOW() WHERE id = ANY($1)", session_ids).Error; err != nil {
 		return fmt.Errorf("%s: %w", fn, err)
 	}
 	return nil
@@ -269,4 +269,19 @@ func (s *Repository) GetDomainUsers(users *[]models.User, domainId uint, opts Ge
 	}
 
 	return nil
+}
+
+// *INFO
+
+//TODO: доделать
+func (s *Repository) GetCountActiveSessions(domain_id uint) (int64, error) {
+	var fn = "internal.repository.getCountActiveSessions"
+
+	var count int64
+
+	if err := s.GormDB.Debug().Model(&models.UserSession{}).Exec("SELECT * FROM user_sessions s LEFT JOIN users u ON u.id=s.user_id WHERE s.active = true AND u.domain_id=?", domain_id).Error; err != nil {
+		return 0, fmt.Errorf("%s: %w", fn, err)
+	}
+
+	return count, nil
 }
