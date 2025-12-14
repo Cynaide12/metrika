@@ -46,7 +46,7 @@ func New(cfg *config.Config) (*Repository, error) {
 	}
 
 	//миграции
-	GormDB.AutoMigrate(&models.Event{}, &models.Domain{}, &models.User{}, &models.UserSession{})
+	GormDB.AutoMigrate(&models.Event{}, &models.Domain{}, &models.Guest{}, &models.GuestSession{})
 
 	return &Repository{
 		GormDB: GormDB,
@@ -83,7 +83,7 @@ func (s *Repository) SaveEvents(events []models.Event) error {
 		eventIds = append(eventIds, event.SessionID)
 	}
 
-	if err := tx.Model(&models.UserSession{}).Where("active = true AND id IN ?", eventIds).Updates(&models.UserSession{LastActive: time.Now()}).Error; err != nil {
+	if err := tx.Model(&models.GuestSession{}).Where("active = true AND id IN ?", eventIds).Updates(&models.GuestSession{LastActive: time.Now()}).Error; err != nil {
 		tx.Rollback()
 		return fmt.Errorf("%s: %w", fn, err)
 	}
@@ -92,20 +92,20 @@ func (s *Repository) SaveEvents(events []models.Event) error {
 }
 
 // *SESSIONS
-func (s *Repository) CreateNewSession(session *models.UserSession) error {
+func (s *Repository) CreateNewSession(session *models.GuestSession) error {
 	var fn = "internal.repository.CreateNewSession"
 
-	if err := s.GormDB.Model(&models.UserSession{}).Create(&session).Error; err != nil {
+	if err := s.GormDB.Model(&models.GuestSession{}).Create(&session).Error; err != nil {
 		return fmt.Errorf("%s: %w", fn, err)
 	}
 
 	return nil
 }
 
-func (s Repository) GetActiveSessions(sessions *[]models.UserSession, limit int) error {
+func (s Repository) GetActiveSessions(sessions *[]models.GuestSession, limit int) error {
 	var fn = "internal.repository.GetActiveSessions"
 
-	if err := s.GormDB.Model(&models.UserSession{}).Limit(limit).Find(sessions).Error; err != nil {
+	if err := s.GormDB.Model(&models.GuestSession{}).Limit(limit).Find(sessions).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrNoRows
 		}
@@ -114,13 +114,13 @@ func (s Repository) GetActiveSessions(sessions *[]models.UserSession, limit int)
 	return nil
 }
 
-func (s Repository) GetStaleSessions(limit int) ([]models.UserSession, error) {
+func (s Repository) GetStaleSessions(limit int) ([]models.GuestSession, error) {
 	var fn = "internal.repository.GetStaleSessions"
 
-	var sessions []models.UserSession
+	var sessions []models.GuestSession
 
 	if err := s.GormDB.Raw(`
-	SELECT s.id, s.last_active FROM user_sessions s WHERE s.active = true AND s.last_active < NOW() - INTERVAL  '25 minutes'
+	SELECT s.id, s.last_active FROM guest_sessions s WHERE s.active = true AND s.last_active < NOW() - INTERVAL  '25 minutes'
 	AND NOT EXISTS 
 	(SELECT 1 FROM events e WHERE e.session_id=s.id AND e.timestamp > NOW() - INTERVAL '30 minutes') 
 	LIMIT $1
@@ -136,42 +136,42 @@ func (s Repository) GetStaleSessions(limit int) ([]models.UserSession, error) {
 func (s *Repository) CloseSession(session_ids []uint) error {
 	var fn = "internal.repository.GetStaleSessions"
 
-	if err := s.GormDB.Exec("UPDATE user_sessions SET active = false, end_time = NOW() WHERE id = ANY($1)", session_ids).Error; err != nil {
+	if err := s.GormDB.Exec("UPDATE guest_sessions SET active = false, end_time = NOW() WHERE id = ANY($1)", session_ids).Error; err != nil {
 		return fmt.Errorf("%s: %w", fn, err)
 	}
 	return nil
 }
 
-func (s *Repository) AddSessions(sessions *[]models.UserSession) error {
+func (s *Repository) AddSessions(sessions *[]models.GuestSession) error {
 	var fn = "internal.repository.AddSessions"
 
-	if err := s.GormDB.Model(&models.UserSession{}).Create(&sessions).Error; err != nil {
+	if err := s.GormDB.Model(&models.GuestSession{}).Create(&sessions).Error; err != nil {
 		return fmt.Errorf("%s: %w", fn, err)
 	}
 
 	return nil
 }
 
-// *USERS
+// *GUESTS
 
-func (s *Repository) GetOrCreateUser(fingerprint string, domain_id uint) (models.User, error) {
-	var fn = "internal.repository.GetOrCreateUser"
+func (s *Repository) GetOrCreateGuest(fingerprint string, domain_id uint) (models.Guest, error) {
+	var fn = "internal.repository.GetOrCreateGuest"
 
-	user := models.User{Fingerprint: fingerprint, DomainID: domain_id}
+	guest := models.Guest{Fingerprint: fingerprint, DomainID: domain_id}
 
-	if err := s.GormDB.Model(&models.User{}).Where("f_id = ?", fingerprint).FirstOrCreate(&user).Error; err != nil {
-		return models.User{}, fmt.Errorf("%s: %w", fn, err)
+	if err := s.GormDB.Model(&models.Guest{}).Where("f_id = ?", fingerprint).FirstOrCreate(&guest).Error; err != nil {
+		return models.Guest{}, fmt.Errorf("%s: %w", fn, err)
 	}
 
-	log.Println("USER", user.ID)
+	log.Println("USER", guest.ID)
 
-	return user, nil
+	return guest, nil
 }
 
-func (s *Repository) AddUsers(users *[]models.User) error {
-	var fn = "internal.repository.AddUsers"
+func (s *Repository) AddGuests(guests *[]models.Guest) error {
+	var fn = "internal.repository.AddGuests"
 
-	if err := s.GormDB.Model(&models.User{}).Create(&users).Error; err != nil {
+	if err := s.GormDB.Model(&models.Guest{}).Create(&guests).Error; err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
 			return ErrAlreadyExists
 		}
@@ -195,7 +195,7 @@ func (s *Repository) GetDomains(domains *[]models.Domain, opts GetDomainsOptions
 	query := s.GormDB.Model(&models.Domain{})
 
 	if opts.preload_relations != nil {
-		query = query.Preload("Users")
+		query = query.Preload("Guests")
 	}
 
 	if opts.limit != nil {
@@ -240,31 +240,31 @@ func (s *Repository) AddDomain(domain *models.Domain) error {
 	return nil
 }
 
-func (s *Repository) GetCountDomainUsers(domainId uint) (int64, error) {
-	var fn = "internal.repository.GetCountDomainUsers"
+func (s *Repository) GetCountDomainGuests(domainId uint) (int64, error) {
+	var fn = "internal.repository.GetCountDomainGuests"
 
 	var count int64
-	if err := s.GormDB.Model(&models.User{}).Where("domain_id = ?", domainId).Count(&count).Error; err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+	if err := s.GormDB.Model(&models.Guest{}).Where("domain_id = ?", domainId).Count(&count).Error; err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return count, fmt.Errorf("%s: %w", fn, err)
 	}
 
 	return count, nil
 }
 
-type GetDomainUsersOptions struct {
+type GetDomainGuestsOptions struct {
 	limit *int
 }
 
-func (s *Repository) GetDomainUsers(users *[]models.User, domainId uint, opts GetDomainUsersOptions) error {
-	var fn = "internal.repository.GetCountDomainUsers"
+func (s *Repository) GetDomainGuests(guests *[]models.Guest, domainId uint, opts GetDomainGuestsOptions) error {
+	var fn = "internal.repository.GetCountDomainGuests"
 
-	query := s.GormDB.Model(&models.User{}).Where("domain_id = ?", domainId)
+	query := s.GormDB.Model(&models.Guest{}).Where("domain_id = ?", domainId)
 
 	if opts.limit != nil {
 		query = query.Limit(*opts.limit)
 	}
 
-	if err := query.Find(&users).Error; err != nil {
+	if err := query.Find(&guests).Error; err != nil {
 		return fmt.Errorf("%s: %w", fn, err)
 	}
 
@@ -279,9 +279,100 @@ func (s *Repository) GetCountActiveSessions(domain_id uint) (int64, error) {
 
 	var count int64
 
-	if err := s.GormDB.Debug().Model(&models.UserSession{}).Exec("SELECT * FROM user_sessions s LEFT JOIN users u ON u.id=s.user_id WHERE s.active = true AND u.domain_id=?", domain_id).Error; err != nil {
+	if err := s.GormDB.Debug().Model(&models.GuestSession{}).Exec("SELECT * FROM guest_sessions s LEFT JOIN guests u ON u.id=s.guest_id WHERE s.active = true AND u.domain_id=?", domain_id).Error; err != nil {
 		return 0, fmt.Errorf("%s: %w", fn, err)
 	}
 
 	return count, nil
+}
+
+
+
+// *USERS
+func (s *Repository) GetUserByEmail(user *models.User, email string) error {
+	const fn = "internal.repository.GetUserByEmail"
+	if err := s.GormDB.First(&user, "email = ?", email).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrNoRows
+		}
+		return fmt.Errorf("%s: %w", fn, err)
+	}
+
+	return nil
+}
+
+func (s *Repository) GetUserByID(user *models.User, id uint) error {
+	const fn = "internal.repository.GetUserByID"
+	if err := s.GormDB.First(&user, "id = ?", id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrNoRows
+		}
+		return fmt.Errorf("%s: %w", fn, err)
+	}
+
+	return nil
+}
+
+func (s *Repository) CreateUser(user *models.User) error {
+	const fn = "internal.repository.CreateUser"
+	if err := s.GormDB.Create(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return ErrNoRows
+		}
+		return fmt.Errorf("%s: %w", fn, err)
+	}
+
+	return nil
+}
+
+
+
+//* AUTH
+
+func (s *Repository) CreateUserSession(session *models.UserSession) error {
+	const fn = "internal.repository.CreateUserSession"
+	if err := s.GormDB.Create(&session).Error; err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return ErrAlreadyExists
+		}
+		return fmt.Errorf("%s: %w", fn, err)
+	}
+
+	return nil
+}
+
+func (s *Repository) UpdateUserSession(session *models.UserSession) error {
+	const fn = "internal.repository.UpdateUserSession"
+	if err := s.GormDB.Where("id = ?", session.ID).Updates(&session).Error; err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return ErrAlreadyExists
+		}
+		return fmt.Errorf("%s: %w", fn, err)
+	}
+
+	return nil
+}
+
+func (s *Repository) DeleteUserSession(session_id uint) error {
+	const fn = "internal.repository.DeleteUserSession"
+	if err := s.GormDB.Where("id = ?", session_id).Delete(&models.UserSession{}).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrNoRows
+		}
+		return fmt.Errorf("%s: %w", fn, err)
+	}
+
+	return nil
+}
+
+func (s *Repository) GetUserSession(session *models.UserSession, id uint) error {
+	const fn = "storage.GetUserSession"
+	if err := s.GormDB.First(&session, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrNoRows
+		}
+		return fmt.Errorf("%s: %w", fn, err)
+	}
+
+	return nil
 }

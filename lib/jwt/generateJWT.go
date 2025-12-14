@@ -12,11 +12,11 @@ var(
 	RefreshTokenMaxAge = int(RefreshTokenTTL.Seconds())
 )
 
-func GenerateAccessJWT(jwt_secret string, email string, userID uint, userRole string) (string, error) {
+func GenerateAccessJWT(jwt_secret string, email string, userID uint, session_id uint) (string, error) {
 	claims := JWTClaims{
 		UserID: userID,
 		Email:    email,
-		Role:	userRole,
+		SessionID:	session_id,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(AccessTokenTTL)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -28,11 +28,11 @@ func GenerateAccessJWT(jwt_secret string, email string, userID uint, userRole st
 	return token.SignedString([]byte(jwt_secret))
 }
 
-func GenerateRefreshJWT(jwt_secret string, email string, userID uint, userRole string) (string, error) {
+func GenerateRefreshJWT(jwt_secret string, email string, userID uint, session_id uint) (string, error) {
 	claims := JWTClaims{
 		UserID: userID,
 		Email:    email,
-		Role: userRole,
+		SessionID: session_id,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(RefreshTokenTTL)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -44,12 +44,12 @@ func GenerateRefreshJWT(jwt_secret string, email string, userID uint, userRole s
 	return token.SignedString([]byte(jwt_secret))
 }
 
-func GeneratePairJWT(jwt_secret string, email string, userID uint, userRole string) (accessToken string, refreshToken string, err error) {
-	access, err := GenerateAccessJWT(jwt_secret, email, userID, userRole)
+func GeneratePairJWT(jwt_secret string, email string, userID uint, session_id uint) (accessToken string, refreshToken string, err error) {
+	access, err := GenerateAccessJWT(jwt_secret, email, userID, session_id)
 	if err != nil {
 		return "", "", err
 	}
-	refresh, err := GenerateRefreshJWT(jwt_secret, email, userID, userRole)
+	refresh, err := GenerateRefreshJWT(jwt_secret, email, userID, session_id)
 	if err != nil {
 		return "", "", err
 	}

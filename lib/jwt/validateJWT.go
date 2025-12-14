@@ -39,7 +39,7 @@ func ValidateJWT(jwtSecret string, tokenString string) (*JWTClaims, error) {
 	}
 
 
-	if claims.Email == "" || claims.Role == "" || claims.UserID == 0{
+	if claims.Email == "" || claims.SessionID == 0 || claims.UserID == 0{
 		return nil, fmt.Errorf("token has no required claims")
 	}
 

@@ -20,7 +20,7 @@ type MockService struct {
 	generator      *mock.Generator
 	tracker        *tracker.Tracker
 	mockDomainId   uint
-	mockUsersIds   []uint
+	mockGuestsIds   []uint
 	mockSessionIds []uint
 	mcfg           config.MockGenerator
 	closeChan      chan struct{}
@@ -36,19 +36,19 @@ func NewMockService(repo *repository.Repository, generator *mock.Generator, log 
 		closeChan: make(chan struct{}),
 	}
 
-	mockDomainId, mockUsersIds, mockSessionIds, err := m.seedMockData()
+	mockDomainId, mockGuestsIds, mockSessionIds, err := m.seedMockData()
 	if err != nil {
 		panic("ошибка при инициализации моковых данных")
 	}
 
 	m.mockDomainId = mockDomainId
 	m.mockSessionIds = mockSessionIds
-	m.mockUsersIds = mockUsersIds
+	m.mockGuestsIds = mockGuestsIds
 
 	return m
 }
 
-func (m MockService) seedMockData() (mockDomainId uint, mockUsersIds []uint, mockSessionIds []uint, err error) {
+func (m MockService) seedMockData() (mockDomainId uint, mockGuestsIds []uint, mockSessionIds []uint, err error) {
 	mockDomainUrl := "https://test.ru"
 
 	domain := models.Domain{
@@ -58,80 +58,80 @@ func (m MockService) seedMockData() (mockDomainId uint, mockUsersIds []uint, moc
 	//проверяем наличие мокового домена
 	err = m.repo.GetDomain(&domain, mockDomainUrl)
 	if err != nil && !errors.Is(err, repository.ErrNoRows) {
-		return 0, mockUsersIds, mockSessionIds, err
+		return 0, mockGuestsIds, mockSessionIds, err
 	}
 
 	if errors.Is(err, repository.ErrNoRows) {
 		//добавляем моковый домен
 		if err := m.repo.AddDomain(&domain); err != nil {
-			return 0, mockUsersIds, mockSessionIds, err
+			return 0, mockGuestsIds, mockSessionIds, err
 		}
 	}
 
 	//инициализируем моковых юзеров домена
-	mockUsersIds, err = m.initMockUsers(domain.ID)
+	mockGuestsIds, err = m.initMockGuests(domain.ID)
 	if err != nil {
-		return 0, mockUsersIds, mockSessionIds, err
+		return 0, mockGuestsIds, mockSessionIds, err
 	}
 
 	//генерируем сессии для моковых юзеров
-	var sessions []models.UserSession
-	for _, id := range mockUsersIds {
-		sessions = append(sessions, *m.generator.GenerateMockUserSession(id))
+	var sessions []models.GuestSession
+	for _, id := range mockGuestsIds {
+		sessions = append(sessions, *m.generator.GenerateMockGuestSession(id))
 	}
 
 	if err := m.repo.AddSessions(&sessions); err != nil {
-		return 0, mockUsersIds, mockSessionIds, err
+		return 0, mockGuestsIds, mockSessionIds, err
 	}
 
 	for _, session := range sessions {
 		mockSessionIds = append(mockSessionIds, session.ID)
 	}
 
-	return domain.ID, mockUsersIds, mockSessionIds, nil
+	return domain.ID, mockGuestsIds, mockSessionIds, nil
 }
 
-func (m MockService) initMockUsers(mockDomainId uint) ([]uint, error) {
-	var mockUsersIds []uint
+func (m MockService) initMockGuests(mockDomainId uint) ([]uint, error) {
+	var mockGuestsIds []uint
 
-	IsFilledUsers, usersToGenerate, err := m.checkLimitDomainUsers(mockDomainId)
+	IsFilledGuests, guestsToGenerate, err := m.checkLimitDomainGuests(mockDomainId)
 	if err != nil {
-		return mockUsersIds, err
+		return mockGuestsIds, err
 	}
 
 	//если юзеры уже добавлены до максимума - не добавляем
-	if !IsFilledUsers {
-		var mockUsersToAdd []models.User
-		for range usersToGenerate {
+	if !IsFilledGuests {
+		var mockGuestsToAdd []models.Guest
+		for range guestsToGenerate {
 			//генерируем юзера
-			mockUsersToAdd = append(mockUsersToAdd, m.generator.GenerateMockUser(mockDomainId))
+			mockGuestsToAdd = append(mockGuestsToAdd, m.generator.GenerateMockGuest(mockDomainId))
 		}
 
 		//добавляем юзеров
-		if err := m.repo.AddUsers(&mockUsersToAdd); err != nil {
-			return mockUsersIds, err
+		if err := m.repo.AddGuests(&mockGuestsToAdd); err != nil {
+			return mockGuestsIds, err
 		}
 	}
 
-	var mockUsers []models.User
+	var mockGuests []models.Guest
 	//получаем юзеров домена
-	if err := m.repo.GetDomainUsers(&mockUsers, mockDomainId, repository.GetDomainUsersOptions{}); err != nil {
-		return mockUsersIds, err
+	if err := m.repo.GetDomainGuests(&mockGuests, mockDomainId, repository.GetDomainGuestsOptions{}); err != nil {
+		return mockGuestsIds, err
 	}
 
 	//собираем id
-	for _, user := range mockUsers {
-		mockUsersIds = append(mockUsersIds, user.ID)
+	for _, guest := range mockGuests {
+		mockGuestsIds = append(mockGuestsIds, guest.ID)
 	}
 
-	return mockUsersIds, nil
+	return mockGuestsIds, nil
 }
 
-func (m MockService) checkLimitDomainUsers(mockDomainId uint) (bool, uint, error) {
-	var fn = "internal.service.mock_service.CheckLimitDomainUsers"
+func (m MockService) checkLimitDomainGuests(mockDomainId uint) (bool, uint, error) {
+	var fn = "internal.service.mock_service.CheckLimitDomainGuests"
 	logger := m.log.With("fn", fn)
 
-	count, err := m.repo.GetCountDomainUsers(mockDomainId)
+	count, err := m.repo.GetCountDomainGuests(mockDomainId)
 	if err != nil {
 		logger.Error("ошибка при получении количества юзеров в тестовом домене", sl.Err(err))
 		return false, 0, fmt.Errorf("%s: %w", fn, err)

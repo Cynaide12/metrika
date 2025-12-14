@@ -20,22 +20,37 @@ type Event struct {
 	// Data      map[string]interface{} `gorm:"column:data;NOT NULL"`
 }
 
-type Domain struct {
-	Model
-	SiteURL string `gorm:"column:site_url;unique;NOT NULL" json:"site_url"`
-	Users   []User `gorm:"foreignkey:DomainID;constraint:OnDelete:CASCADE"`
-}
-
 type User struct {
 	Model
-	DomainID    uint          `gorm:"column:domain_id;NOT NULL"`
-	Fingerprint string        `gorm:"column:f_id" json:"f_id"`
-	Sessions    []UserSession `gorm:"foreignkey:UserID;constraint:OnDelete:CASCADE" json:"sessions,omitempty"`
+	Name      string `gorm:"column:name;NOT NULL" json:"name"`
+	Email     string `gorm:"column:email;NOT NULL;unique" json:"email"`
+	Password  []byte `gorm:"column:password;NOT NULL" json:"password,omitempty"`
+	LastLogin string `gorm:"column:last_login" json:"last_login,omitempty"`
 }
 
 type UserSession struct {
 	Model
-	UserID     uint      `gorm:"column:user_id;NOT NULL" json:"user_id"`
+	UserID       uint   `gorm:"column:user_id;NOT NULL"`
+	RefreshToken string `gorm:"column:refresh_token"`
+	UserAgent    string `gorm:"column:user_agent"`
+}
+
+type Domain struct {
+	Model
+	SiteURL string `gorm:"column:site_url;unique;NOT NULL" json:"site_url"`
+	Guests   []Guest `gorm:"foreignkey:DomainID;constraint:OnDelete:CASCADE"`
+}
+
+type Guest struct {
+	Model
+	DomainID    uint          `gorm:"column:domain_id;NOT NULL"`
+	Fingerprint string        `gorm:"column:f_id" json:"f_id"`
+	Sessions    []GuestSession `gorm:"foreignkey:GuestID;constraint:OnDelete:CASCADE" json:"sessions,omitempty"`
+}
+
+type GuestSession struct {
+	Model
+	GuestID     uint      `gorm:"column:guest_id;NOT NULL" json:"guest_id"`
 	IPAddress  string    `gorm:"column:ip_address;NOT NULL" json:"ip_address"`
 	Active     bool      `gorm:"column:active;NOT NULL;default:false"`
 	EndTime    *time.Time `gorm:"column:end_time;default:NULL"`

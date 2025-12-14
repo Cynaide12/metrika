@@ -22,7 +22,6 @@ import (
 	"github.com/robfig/cron/v3"
 )
 
-//TODO: сделать инит роутов и можно попробовать написать генератор моковых данных
 
 func main() {
 	cfg := config.MustLoad()

@@ -40,9 +40,9 @@ func (g *Generator) GenerateBucketSize(min, max int) int {
 	return min + rand.IntN(max-min)
 }
 
-func (g *Generator) GenerateMockUserSession(user_id uint) *models.UserSession {
-	return &models.UserSession{
-		UserID:    user_id,
+func (g *Generator) GenerateMockGuestSession(guest_id uint) *models.GuestSession {
+	return &models.GuestSession{
+		GuestID:    guest_id,
 		Active:    true,
 		IPAddress: g.generateRandomUuid(),
 	}
@@ -57,8 +57,8 @@ func (g *Generator) GenerateMockEvent(session_id uint) *models.Event {
 	}
 }
 
-func (g *Generator) GenerateMockUser(domainId uint) models.User {
-	return models.User{
+func (g *Generator) GenerateMockGuest(domainId uint) models.Guest {
+	return models.Guest{
 		Fingerprint: g.generateRandomUuid(),
 		DomainID:    domainId,
 	}

@@ -8,8 +8,8 @@ var (
 )
 
 type JWTClaims struct {
-	UserID uint   `json:"user_id"`
-	Email  string `json:"email"`
-	Role   string `json:"role"`
+	UserID    uint   `json:"user_id"`
+	Email     string `json:"email"`
+	SessionID uint   `json:"session_id"`
 	jwt.RegisteredClaims
 }

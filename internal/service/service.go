@@ -48,7 +48,7 @@ func (s *Service) GetDomains(domains *[]models.Domain, opts repository.GetDomain
 }
 
 // * SESSIONS
-func (s *Service) CreateNewSession(FingerprintID, IPAddress string, domainUrl string) (models.UserSession, error) {
+func (s *Service) CreateNewSession(FingerprintID, IPAddress string, domainUrl string) (models.GuestSession, error) {
 	var fn = "internal.service.NewSession"
 
 	logger := s.log.With("fn", fn)
@@ -58,21 +58,21 @@ func (s *Service) CreateNewSession(FingerprintID, IPAddress string, domainUrl st
 
 	if err := s.repo.GetDomain(&domain, domainUrl); err != nil {
 		if errors.Is(err, repository.ErrNoRows) {
-			return models.UserSession{}, ErrNotFound
+			return models.GuestSession{}, ErrNotFound
 		}
 		logger.Error("ошибка получения домена", sl.Err(err))
-		return models.UserSession{}, err
+		return models.GuestSession{}, err
 	}
 
 	//ищем юзера по переданному отпечатку
-	user, err := s.repo.GetOrCreateUser(FingerprintID, domain.ID)
+	guest, err := s.repo.GetOrCreateGuest(FingerprintID, domain.ID)
 	if err != nil {
 		logger.Error("ошибка получения юзера по f_id", sl.Err(err))
-		return models.UserSession{}, err
+		return models.GuestSession{}, err
 	}
 
-	session := models.UserSession{
-		UserID:     user.ID,
+	session := models.GuestSession{
+		GuestID:     guest.ID,
 		IPAddress:  IPAddress,
 		EndTime:    nil,
 		Active:     true,
@@ -81,7 +81,7 @@ func (s *Service) CreateNewSession(FingerprintID, IPAddress string, domainUrl st
 
 	if err := s.repo.CreateNewSession(&session); err != nil {
 		logger.Error("ошибка создания новой сессии", sl.Err(err))
-		return models.UserSession{}, err
+		return models.GuestSession{}, err
 	}
 
 	return session, nil
