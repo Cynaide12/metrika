@@ -11,8 +11,7 @@ import (
 	"github.com/go-chi/render"
 )
 
-
-//TODO: придумать че делать с роутами тут
+// TODO: придумать че делать с роутами тут
 type Handler struct {
 	log     *slog.Logger
 	service HandlerService
@@ -43,31 +42,27 @@ func (h Handler) Health() http.HandlerFunc {
 
 }
 
-
-
 //*INFO
 
 func (h Handler) GetCountActiveSessions() http.HandlerFunc {
-	return func (w http.ResponseWriter, r *http.Request){
+	return func(w http.ResponseWriter, r *http.Request) {
 		var fn = "internal.http-server.handlers.NewSession"
 
-		
 		domainId, err := strconv.Atoi(chi.URLParam(r, "id"))
-		if err != nil{
+		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			render.JSON(w,r, response.ErrorWithStatus(response.StatusBadRequest, "bad domain id"))
+			render.JSON(w, r, response.ErrorWithStatus(response.StatusBadRequest, "bad domain id"))
 			return
 		}
 		logger := h.log.With("handlerFn", fn, "domain_id", domainId)
 
 		count, err := h.service.GetCountActiveSessions(uint(domainId))
-		if err != nil{
+		if err != nil {
 			logger.Error("failed to get count active sessions", sl.Err(err))
 			w.WriteHeader(http.StatusInternalServerError)
-			render.JSON(w,r, response.Error("failed to get active sessions"))
+			render.JSON(w, r, response.Error("failed to get active sessions"))
 			return
 		}
-
 
 		render.JSON(w, r, GetCountActiveSessionsResponse{
 			Count: count,

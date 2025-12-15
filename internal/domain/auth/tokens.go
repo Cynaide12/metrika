@@ -1,11 +1,11 @@
-package lib_jwt
+package auth
 
 import "github.com/golang-jwt/jwt/v5"
 
-var (
-	AccessTokenJson  = "access_token"
-	RefreshTokenJson = "refresh_token"
-)
+type Tokens struct {
+	Access  string
+	Refresh string
+}
 
 type JWTClaims struct {
 	UserID    uint   `json:"user_id"`

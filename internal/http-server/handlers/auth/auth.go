@@ -38,58 +38,58 @@ func NewAuthHandler(log *slog.Logger, service AuthService, r chi.Router) *authha
 	return h
 }
 
-func (h *authhandler) Login() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		const fn = "http-server.handlers.auth.Login"
-		logger := h.log.With(slog.String("fn", fn))
+// func (h *authhandler) Login() http.HandlerFunc {
+// 	return func(w http.ResponseWriter, r *http.Request) {
+// 		const fn = "http-server.handlers.auth.Login"
+// 		logger := h.log.With(slog.String("fn", fn))
 
-		var req LoginRequest
+// 		var req LoginRequest
 
-		// декодируем запрос в структуру
-		if err := render.Decode(r, &req); err != nil {
-			logger.Error("failed to decode request", sl.Err(err))
-			w.WriteHeader(http.StatusBadRequest)
-			render.JSON(w, r, response.Error("invalid request"))
-			return
-		}
+// 		// декодируем запрос в структуру
+// 		if err := render.Decode(r, &req); err != nil {
+// 			logger.Error("failed to decode request", sl.Err(err))
+// 			w.WriteHeader(http.StatusBadRequest)
+// 			render.JSON(w, r, response.Error("invalid request"))
+// 			return
+// 		}
 
-		// валидация запроса
-		if err := response.ValidateRequest(&req); err != nil {
-			validateErr := err.(validator.ValidationErrors)
-			logger.Error("invalid request", sl.Err(err))
-			w.WriteHeader(http.StatusBadRequest)
-			render.JSON(w, r, response.ValidationError(validateErr))
-			return
-		}
+// 		// валидация запроса
+// 		if err := response.ValidateRequest(&req); err != nil {
+// 			validateErr := err.(validator.ValidationErrors)
+// 			logger.Error("invalid request", sl.Err(err))
+// 			w.WriteHeader(http.StatusBadRequest)
+// 			render.JSON(w, r, response.ValidationError(validateErr))
+// 			return
+// 		}
 
-		accessToken, refreshToken, err := h.service.Login(req.Email, req.Password, r.UserAgent())
-		if err != nil {
-			if errors.Is(err, service.ErrAlreadyExists) {
-				w.WriteHeader(http.StatusUnauthorized)
-				render.JSON(w, r, "user not found")
-				return
-			}
-			if errors.Is(err, service.Unauthorized) {
-				w.WriteHeader(http.StatusUnauthorized)
-				render.JSON(w, r, "unathorized")
-				return
-			}
-			logger.Error("failed to login", sl.Err(err))
-			w.WriteHeader(http.StatusInternalServerError)
-			render.JSON(w, r, response.Error("failed to login"))
-			return
-		}
+// 		accessToken, refreshToken, err := h.service.Login(req.Email, req.Password, r.UserAgent())
+// 		if err != nil {
+// 			if errors.Is(err, service.ErrAlreadyExists) {
+// 				w.WriteHeader(http.StatusUnauthorized)
+// 				render.JSON(w, r, "user not found")
+// 				return
+// 			}
+// 			if errors.Is(err, service.Unauthorized) {
+// 				w.WriteHeader(http.StatusUnauthorized)
+// 				render.JSON(w, r, "unathorized")
+// 				return
+// 			}
+// 			logger.Error("failed to login", sl.Err(err))
+// 			w.WriteHeader(http.StatusInternalServerError)
+// 			render.JSON(w, r, response.Error("failed to login"))
+// 			return
+// 		}
 
-		//установка рефреш токена в куки
-		lib_cookie.AddCookie(w, refreshToken)
+// 		//установка рефреш токена в куки
+// 		lib_cookie.AddCookie(w, refreshToken)
 
-		render.JSON(w, r, AuthResponse{
-			Token:    accessToken,
-			Response: response.OK(),
-		})
+// 		render.JSON(w, r, AuthResponse{
+// 			Token:    accessToken,
+// 			Response: response.OK(),
+// 		})
 
-	}
-}
+// 	}
+// }
 
 func (h *authhandler) Register() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -158,49 +158,49 @@ func (h *authhandler) Register() http.HandlerFunc {
 	}
 }
 
-// получение нового access токена по refresh токену и замена refresh токена
-func (h *authhandler) Refresh() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		const fn = "http-server.handlers.auth.Refresh"
-		logger := h.log.With(slog.String("fn", fn))
+// // получение нового access токена по refresh токену и замена refresh токена
+// func (h *authhandler) Refresh() http.HandlerFunc {
+// 	return func(w http.ResponseWriter, r *http.Request) {
+// 		const fn = "http-server.handlers.auth.Refresh"
+// 		logger := h.log.With(slog.String("fn", fn))
 
-		refresh_token, err := r.Cookie("refresh_token")
-		if err != nil {
-			logger.Error("error", sl.Err(err))
-		}
-		if refresh_token == nil || err != nil {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
+// 		refresh_token, err := r.Cookie("refresh_token")
+// 		if err != nil {
+// 			logger.Error("error", sl.Err(err))
+// 		}
+// 		if refresh_token == nil || err != nil {
+// 			w.WriteHeader(http.StatusUnauthorized)
+// 			return
+// 		}
 
-		accessToken, refreshToken, err := h.service.RefreshTokens(refresh_token)
-		if err != nil {
-			if errors.Is(err, service.UserNotFound) {
-				w.WriteHeader(http.StatusBadRequest)
-				render.JSON(w, r, "user not found")
-				return
-			}
-			if errors.Is(err, service.Unauthorized) || errors.Is(err, service.RefreshTokenInvalid) {
-				w.WriteHeader(http.StatusUnauthorized)
-				render.JSON(w, r, "unathorized")
-				return
-			}
-			logger.Error("failed to refresh tokens", sl.Err(err))
-			w.WriteHeader(http.StatusInternalServerError)
-			render.JSON(w, r, response.Error("failed to refresh tokens"))
-			return
-		}
+// 		accessToken, refreshToken, err := h.service.RefreshTokens(refresh_token)
+// 		if err != nil {
+// 			if errors.Is(err, service.UserNotFound) {
+// 				w.WriteHeader(http.StatusBadRequest)
+// 				render.JSON(w, r, "user not found")
+// 				return
+// 			}
+// 			if errors.Is(err, service.Unauthorized) || errors.Is(err, service.RefreshTokenInvalid) {
+// 				w.WriteHeader(http.StatusUnauthorized)
+// 				render.JSON(w, r, "unathorized")
+// 				return
+// 			}
+// 			logger.Error("failed to refresh tokens", sl.Err(err))
+// 			w.WriteHeader(http.StatusInternalServerError)
+// 			render.JSON(w, r, response.Error("failed to refresh tokens"))
+// 			return
+// 		}
 
-		//установка нового рефреш токена в куки
-		lib_cookie.AddCookie(w, refreshToken)
+// 		//установка нового рефреш токена в куки
+// 		lib_cookie.AddCookie(w, refreshToken)
 
-		render.JSON(w, r, AuthResponse{
-			Token:    accessToken,
-			Response: response.OK(),
-		})
+// 		render.JSON(w, r, AuthResponse{
+// 			Token:    accessToken,
+// 			Response: response.OK(),
+// 		})
 
-	}
-}
+// 	}
+// }
 
 func (h *authhandler) Logout() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

@@ -4,7 +4,7 @@ import (
 	"io"
 	"log/slog"
 	"metrika/internal/config"
-	slogpretty "metrika/lib/logger/handlers"
+	slogpretty "metrika/pkg/logger/handlers"
 	"net/http"
 	"os"
 	"time"

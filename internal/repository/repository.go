@@ -46,7 +46,7 @@ func New(cfg *config.Config) (*Repository, error) {
 	}
 
 	//миграции
-	GormDB.AutoMigrate(&models.Event{}, &models.Domain{}, &models.Guest{}, &models.GuestSession{})
+	GormDB.AutoMigrate(&models.Event{}, &models.Domain{}, &models.Guest{}, &models.GuestSession{}, &models.UserSession{}, &models.User{})
 
 	return &Repository{
 		GormDB: GormDB,
