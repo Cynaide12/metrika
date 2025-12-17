@@ -6,4 +6,3 @@ type Session struct {
     UserAgent string
     RefreshToken string
 }
-

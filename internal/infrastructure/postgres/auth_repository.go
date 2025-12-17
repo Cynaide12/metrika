@@ -3,7 +3,6 @@ package postgres
 import (
 	"context"
 	"errors"
-	"fmt"
 	"metrika/internal/domain/auth"
 
 	"gorm.io/gorm"
@@ -18,13 +17,14 @@ func NewAuthRepository(db *gorm.DB) *AuthRepository {
 }
 
 func (r *AuthRepository) ByEmail(ctx context.Context, email string) (*auth.User, error) {
-	const fn = "internal.repository.GetUserByEmail"
+	db := getDB(ctx, r.db)
+
 	var user User
-	if err := r.db.First(&user, "email = ?", email).Error; err != nil {
+	if err := db.First(&user, "email = ?", email).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, auth.ErrUserNotFound
 		}
-		return nil, fmt.Errorf("%s: %w", fn, err)
+		return nil, err
 	}
 
 	authUser := auth.User{
@@ -36,23 +36,23 @@ func (r *AuthRepository) ByEmail(ctx context.Context, email string) (*auth.User,
 	return &authUser, nil
 }
 
+func (r *AuthRepository) CreateUser(ctx context.Context, auser *auth.User) error {
+	db := getDB(ctx, r.db)
 
-//TODO: доделать
-func (r *AuthRepository) CreateUser(ctx context.Context, user *auth.User) (error) {
-	const fn = "internal.repository.CreateUser"dasd
+	user := User{
+		Email:    auser.Email,
+		Password: auser.Password.Hash,
+	}
 
-	if err := r.db.Model().Error; err != nil {
+	if err := db.Model(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, auth.ErrUserNotFound
+			return auth.ErrUserNotFound
 		}
-		return nil, fmt.Errorf("%s: %w", fn, err)
+		return err
 	}
 
-	authUser := auth.User{
-		ID:       user.ID,
-		Email:    user.Email,
-		Password: auth.NewPasswordFromHash(user.Password),
-	}
+	//записываем id созданного юзера
+	auser.SetID(user.ID)
 
-	return &authUser, nil
+	return nil
 }

@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"fmt"
 	domain "metrika/internal/domain/auth"
 
 	"gorm.io/gorm"
@@ -19,7 +18,7 @@ func NewSessionRepository(db *gorm.DB) *SessionRepository {
 }
 
 func (r *SessionRepository) Create(ctx context.Context, s *domain.Session) error {
-	const fn = "internal.repository.auth.Create"
+	db := getDB(ctx, r.db)
 
 	session := UserSession{
 		UserID:       s.UserID,
@@ -27,9 +26,11 @@ func (r *SessionRepository) Create(ctx context.Context, s *domain.Session) error
 		UserAgent:    s.UserAgent,
 	}
 
-	if err := r.db.Create(&session).Error; err != nil {
-		return fmt.Errorf("%s: %w", fn, err)
+	if err := db.Create(&session).Error; err != nil {
+		return err
 	}
+
+	s.ID = session.ID
 
 	return nil
 }
@@ -38,7 +39,6 @@ func (r *SessionRepository) ByID(
 	ctx context.Context,
 	id uint,
 ) (*domain.Session, error) {
-
 	db := getDB(ctx, r.db)
 
 	var m UserSession
@@ -58,7 +58,6 @@ func (r *SessionRepository) Update(
 	ctx context.Context,
 	s *domain.Session,
 ) error {
-
 	db := getDB(ctx, r.db)
 
 	return db.Model(&UserSession{}).

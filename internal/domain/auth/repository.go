@@ -6,6 +6,7 @@ import (
 
 type UserRepository interface {
 	ByEmail(ctx context.Context, email string) (*User, error)
+	CreateUser(ctx context.Context, auser *User) error
 }
 
 type SessionRepository interface {

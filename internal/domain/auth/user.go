@@ -5,3 +5,7 @@ type User struct {
     Email    string
     Password Password
 }
+
+func (u *User) SetID(id uint){
+    u.ID = id
+}

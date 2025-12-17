@@ -4,7 +4,7 @@ import (
 	crypto "crypto/rand"
 	"fmt"
 	"math/rand/v2"
-	"metrika/internal/models"
+	domain "metrika/internal/domain/analytics"
 	"sync/atomic"
 	"time"
 )
@@ -40,16 +40,16 @@ func (g *Generator) GenerateBucketSize(min, max int) int {
 	return min + rand.IntN(max-min)
 }
 
-func (g *Generator) GenerateMockGuestSession(guest_id uint) *models.GuestSession {
-	return &models.GuestSession{
+func (g *Generator) GenerateMockGuestSession(guest_id uint) *domain.GuestSession {
+	return &domain.GuestSession{
 		GuestID:    guest_id,
 		Active:    true,
 		IPAddress: g.generateRandomUuid(),
 	}
 }
 
-func (g *Generator) GenerateMockEvent(session_id uint) *models.Event {
-	return &models.Event{
+func (g *Generator) GenerateMockEvent(session_id uint) *domain.Event {
+	return &domain.Event{
 		SessionID: session_id,
 		Type:      "Generator",
 		PageURL:   "Generator",
@@ -57,8 +57,8 @@ func (g *Generator) GenerateMockEvent(session_id uint) *models.Event {
 	}
 }
 
-func (g *Generator) GenerateMockGuest(domainId uint) models.Guest {
-	return models.Guest{
+func (g *Generator) GenerateMockGuest(domainId uint) domain.Guest {
+	return domain.Guest{
 		Fingerprint: g.generateRandomUuid(),
 		DomainID:    domainId,
 	}

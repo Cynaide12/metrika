@@ -45,12 +45,16 @@ func (uc *LoginUseCase) Execute(
 		UserAgent: userAgent,
 	}
 
+	if err := uc.sessions.Create(ctx, session); err != nil {
+		return nil, err
+	}
+
 	tokens, err := uc.tokens.GeneratePair(user.Email, user.ID, session.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := uc.sessions.Create(ctx, session); err != nil {
+	if err := uc.sessions.Update(ctx, session); err != nil {
 		return nil, err
 	}
 

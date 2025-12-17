@@ -3,15 +3,12 @@ package main
 import (
 	"log/slog"
 	"metrika/internal/config"
-	"metrika/internal/http-server/handlers"
-	"metrika/internal/logger"
-	"metrika/internal/mock"
-	worker "metrika/internal/workers"
+	"metrika/internal/infrastructure/logger"
+	"metrika/internal/infrastructure/postgres"
+	sessionworker "metrika/internal/infrastructure/session_worker"
+	"metrika/internal/infrastructure/tracker"
+	"metrika/pkg/logger/sl"
 
-	"metrika/internal/repository"
-	"metrika/internal/service"
-	"metrika/internal/tracker"
-	"metrika/lib/logger/sl"
 	"net/http"
 	"os"
 	"time"
@@ -39,15 +36,17 @@ func main() {
 
 	log.Info("logs rotation are enabled")
 
-	storage, err := repository.New(cfg)
+	db, err := postgres.New(cfg)
 	if err != nil {
 		log.Error("failed connect to db", sl.Err(err))
 		os.Exit(1)
 	}
 
-	tracker := tracker.New(1000, time.Second * 15, 10000, storage)
+	events := postgres.NewEventsRepository(db)
 
-	sessions_worker := worker.NewSessionsWorker(log, storage, time.Second*15)
+	tracker := tracker.New(1000, time.Second * 15, 10000, events)
+
+	sessions_worker := sessionworker.NewSessionsWorker(log, time.Second*15, events)
 
 	go sessions_worker.StartSessionManager()
 
