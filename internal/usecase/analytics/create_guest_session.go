@@ -16,6 +16,15 @@ type CreateGuestSessionUseCase struct {
 	logger   *slog.Logger
 }
 
+func NewCreateGuestSessionUseCase(
+	guests domain.GuestsRepository,
+	sessions domain.GuestSessionRepository,
+	domain domain.DomainRepository,
+	logger *slog.Logger,
+) *CreateGuestSessionUseCase {
+	return &CreateGuestSessionUseCase{guests, sessions, domain, logger}
+}
+
 func (gc *CreateGuestSessionUseCase) Execute(ctx context.Context, FingerprintID, IPAddress string, domainUrl string) (*domain.GuestSession, error) {
 
 	//ищем домен

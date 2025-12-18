@@ -3,10 +3,17 @@ package main
 import (
 	"log/slog"
 	"metrika/internal/config"
+	"metrika/internal/domain/analytics"
+	"metrika/internal/infrastructure/jwt"
 	"metrika/internal/infrastructure/logger"
+	"metrika/internal/infrastructure/mock"
 	"metrika/internal/infrastructure/postgres"
 	sessionworker "metrika/internal/infrastructure/session_worker"
 	"metrika/internal/infrastructure/tracker"
+	analhandler "metrika/internal/transport/http/v1/analytics"
+	authhandler "metrika/internal/transport/http/v1/auth"
+	analuc "metrika/internal/usecase/analytics"
+	authuc "metrika/internal/usecase/auth"
 	"metrika/pkg/logger/sl"
 
 	"net/http"
@@ -19,6 +26,14 @@ import (
 	"github.com/robfig/cron/v3"
 )
 
+type repos struct {
+	domains        *analytics.DomainRepository
+	events         *postgres.EventsRepository
+	sessions       *postgres.SessionRepository
+	guests         *postgres.GuestsRepository
+	guest_sessions *postgres.GuestSessionRepository
+	users          *postgres.AuthRepository
+}
 
 func main() {
 	cfg := config.MustLoad()
@@ -43,10 +58,13 @@ func main() {
 	}
 
 	events := postgres.NewEventsRepository(db)
+	guest_sessions := postgres.NewGuestSessionRepository(db)
+	tx := postgres.NewTxManager(db)
+	cleanup_stale_sessions_uc := analuc.NewCleanupBatchSessionsUseCase(log, guest_sessions, tx)
 
-	tracker := tracker.New(1000, time.Second * 15, 10000, events)
+	tracker := tracker.New(1000, time.Second*15, 10000, events)
 
-	sessions_worker := sessionworker.NewSessionsWorker(log, time.Second*15, events)
+	sessions_worker := sessionworker.NewSessionsWorker(log, time.Second*15, cleanup_stale_sessions_uc)
 
 	go sessions_worker.StartSessionManager()
 
@@ -59,10 +77,13 @@ func main() {
 	initRouter(cfg, log, storage, tracker)
 }
 
-func setupMockGenerator(storage *repository.Repository, log *slog.Logger, tracker *tracker.Tracker, cfg *config.Config) {
+func setupMockGenerator(log *slog.Logger, tracker *tracker.Tracker, cfg *config.Config, repos repos) {
 	mockGenerator := mock.NewGenerator()
-
-	mockService := service.NewMockService(storage, mockGenerator, log, tracker, cfg.MockConfig)
+	adapter := mock.MockServiceAdapter{Events: repos.events,
+		Domains:  *repos.domains,
+		Sessions: repos.guest_sessions,
+		Guests:   repos.guests}
+	mockService := mock.NewMockService(adapter, mockGenerator, log, tracker, cfg.MockConfig)
 
 	go mockService.StartEventsGenerator()
 }
@@ -78,7 +99,7 @@ func setupLogRotation(rotate func()) {
 	c.Start()
 }
 
-func initRouter(cfg *config.Config, log *slog.Logger, storage *repository.Repository, tracker *tracker.Tracker) {
+func initRouter(cfg *config.Config, log *slog.Logger, tracker *tracker.Tracker, tx *postgres.TxManager, repos repos) {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -109,9 +130,17 @@ func initRouter(cfg *config.Config, log *slog.Logger, storage *repository.Reposi
 		Debug:            true,
 	}))
 
-	ms := service.New(storage, log, tracker)
+	evuc := analuc.NewCollectEventsUseCase(repos.events, tracker, repos.guest_sessions, tx)
+	createsesuc := analuc.NewCreateGuestSessionUseCase(repos.guests, repos.guest_sessions, *repos.domains, log)
 
-	handlers.New(log, ms, r)
+	tokens := jwt.NewJwtProvider(cfg.JWTSecret)
+
+	loginuc := authuc.NewLoginUseCase(repos.users, repos.sessions, tokens)
+	refreshuc := authuc.NewRefreshUseCase(repos.sessions, tokens)
+	registeruc := authuc.NewRegisterUseCase(repos.users, repos.sessions, tokens)
+
+	analhandler.NewHandler(log, evuc, createsesuc)
+	authhandler.NewHandler(log, loginuc, refreshuc, registeruc)
 
 	log.Info("starting server", slog.String("address", srv.Addr))
 

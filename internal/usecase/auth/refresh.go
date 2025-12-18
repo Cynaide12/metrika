@@ -10,6 +10,13 @@ type RefreshUseCase struct {
     tokens   TokenProvider
 }
 
+func NewRefreshUseCase(
+	sessions domain.SessionRepository,
+	tokens TokenProvider,
+) *RefreshUseCase {
+	return &RefreshUseCase{sessions, tokens}
+}
+
 func (uc *RefreshUseCase) Execute(
     ctx context.Context,
     refreshToken string,

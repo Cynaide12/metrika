@@ -22,6 +22,10 @@ var (
 	RefreshTokenJson   = "refresh_token"
 )
 
+func NewJwtProvider(jwt_secret string) *JWTProvider {
+	return &JWTProvider{jwt_secret}
+}
+
 func (p *JWTProvider) GenerateAccessJWT(email string, userID uint, session_id uint) (string, error) {
 	claims := domain.JWTClaims{
 		UserID:    userID,

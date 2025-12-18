@@ -25,14 +25,18 @@ type MockService struct {
 	closeChan      chan struct{}
 }
 
-type MockServiceAdapter interface {
-	AddGuest(ctx context.Context, FingerprintID, IPAddress string, domainUrl string) error
-	AddSessions(ctx context.Context, sessions *[]domain.GuestSession) error
-	AddDomain(ctx context.Context, d domain.Domain) error
-	AddGuests(ctx context.Context, guests *[]domain.Guest) error
-	GetDomainGuests(ctx context.Context, domainId uint) ([]domain.Guest, error)
-	GetCountDomainGuests(ctx context.Context, domainid uint) (int64, error)
-	GetDomain(ctx context.Context, url string) (domain.Domain, error)
+type MockServiceAdapter struct {
+	// AddGuest(ctx context.Context, FingerprintID, IPAddress string, domainUrl string) error
+	// AddSessions(ctx context.Context, sessions *[]domain.GuestSession) error
+	// AddDomain(ctx context.Context, d domain.Domain) error
+	// AddGuests(ctx context.Context, guests *[]domain.Guest) error
+	// GetDomainGuests(ctx context.Context, domainId uint) ([]domain.Guest, error)
+	// GetCountDomainGuests(ctx context.Context, domainid uint) (int64, error)
+	// ByURL(ctx context.Context, url string) (domain.Domain, error)
+	Events domain.EventsRepository
+	Guests domain.GuestsRepository
+	Sessions domain.GuestSessionRepository
+	Domains domain.DomainRepository
 }
 
 func NewMockService(adapter MockServiceAdapter, generator *Generator, log *slog.Logger, tracker *tracker.Tracker, mcfg config.MockGenerator) *MockService {
@@ -63,14 +67,14 @@ func (m MockService) seedMockData() (mockDomainId uint, mockGuestsIds []uint, mo
 	ctx := context.Background()
 
 	//проверяем наличие мокового домена
-	dom, err := m.adapter.GetDomain(ctx, mockDomainUrl)
+	dom, err := m.adapter.Domains.ByURL(ctx, mockDomainUrl)
 	if err != nil && !errors.Is(err, domain.ErrDomainNotFound) {
 		return 0, mockGuestsIds, mockSessionIds, err
 	}
 
 	if errors.Is(err, domain.ErrDomainNotFound) {
 		//добавляем моковый домен
-		if err := m.adapter.AddDomain(ctx, domain.Domain{SiteURL: mockDomainUrl}); err != nil {
+		if err := m.adapter.Domains.AddDomain(ctx, domain.Domain{SiteURL: mockDomainUrl}); err != nil {
 			return 0, mockGuestsIds, mockSessionIds, err
 		}
 	}
@@ -87,10 +91,11 @@ func (m MockService) seedMockData() (mockDomainId uint, mockGuestsIds []uint, mo
 		sessions = append(sessions, *m.generator.GenerateMockGuestSession(id))
 	}
 
-	if err := m.adapter.AddSessions(ctx, &sessions); err != nil {
+	if err := m.adapter.Sessions.CreateSessions(ctx, &sessions); err != nil {
 		return 0, mockGuestsIds, mockSessionIds, err
 	}
 
+	//TODO: НЕ ЗАБЫТЬ ЧТО В МАССИВ НИКАКИЕ ID НЕ ЗАПИСЫВАЮТСЯ НАДО ДОРАБОТРАТЬ ФУНКИЮ CREATESESSIONS В РЕПОЗИТОРИИ
 	for _, session := range sessions {
 		mockSessionIds = append(mockSessionIds, session.ID)
 	}
@@ -114,14 +119,15 @@ func (m MockService) initMockGuests(ctx context.Context, mockDomainId uint) ([]u
 			mockGuestsToAdd = append(mockGuestsToAdd, m.generator.GenerateMockGuest(mockDomainId))
 		}
 
+	//TODO: НЕ ЗАБЫТЬ ЧТО В МАССИВ НИКАКИЕ ID НЕ ЗАПИСЫВАЮТСЯ НАДО ДОРАБОТРАТЬ ФУНКИЮ AddGuests В РЕПОЗИТОРИИ И ВАЩЕ НЕ ФАКТ ЧТО ЭТО НАДО!! ПРОВЕРИТЬ!!
 		//добавляем юзеров
-		if err := m.adapter.AddGuests(ctx, &mockGuestsToAdd); err != nil {
+		if err := m.adapter.Guests.CreateGuests(ctx, &mockGuestsToAdd); err != nil {
 			return mockGuestsIds, err
 		}
 	}
 
 	//получаем юзеров домена
-	mockGuests, err := m.adapter.GetDomainGuests(ctx, mockDomainId)
+	mockGuests, err := m.adapter.Guests.GetDomainGuests(ctx, mockDomainId)
 	if err != nil {
 		return mockGuestsIds, err
 	}
@@ -138,7 +144,7 @@ func (m MockService) checkLimitDomainGuests(ctx context.Context, mockDomainId ui
 	var fn = "internal.service.mock_service.CheckLimitDomainGuests"
 	logger := m.log.With("fn", fn)
 
-	count, err := m.adapter.GetCountDomainGuests(ctx, mockDomainId)
+	count, err := m.adapter.Domains.GetCountDomainGuests(ctx, mockDomainId)
 	if err != nil {
 		logger.Error("ошибка при получении количества юзеров в тестовом домене", sl.Err(err))
 		return false, 0, fmt.Errorf("%s: %w", fn, err)

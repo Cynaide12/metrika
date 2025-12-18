@@ -18,11 +18,12 @@ type Handler struct {
 	log     *slog.Logger
 	login   *auth.LoginUseCase
 	refresh *auth.RefreshUseCase
+	register *auth.RegisterUseCase
 	jwt     *jwt.JWTProvider
 }
 
-func NewHandler(log *slog.Logger, login *auth.LoginUseCase, refresh *auth.RefreshUseCase) *Handler {
-	return &Handler{login: login, refresh: refresh, log: log}
+func NewHandler(log *slog.Logger, login *auth.LoginUseCase, refresh *auth.RefreshUseCase, register *auth.RegisterUseCase) *Handler {
+	return &Handler{login: login, refresh: refresh, log: log, register: register}
 }
 
 type LoginRequest struct {

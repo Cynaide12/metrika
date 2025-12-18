@@ -11,6 +11,14 @@ type RegisterUseCase struct {
 	tokens   TokenProvider
 }
 
+func NewRegisterUseCase(
+	users domain.UserRepository,
+	sessions domain.SessionRepository,
+	tokens TokenProvider,
+) *RegisterUseCase {
+	return &RegisterUseCase{users, sessions, tokens}
+}
+
 func (uc *RegisterUseCase) Execute(
 	ctx context.Context,
 	email string,

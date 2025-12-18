@@ -36,6 +36,27 @@ func (d *GuestSessionRepository) Create(ctx context.Context, session *domain.Gue
 	return nil
 }
 
+func (d *GuestSessionRepository) CreateSessions(ctx context.Context, sessions *[]domain.GuestSession) error {
+	db := getDB(ctx, d.db)
+
+	var mSessions []GuestSession
+	for _, session := range *sessions {
+		mSessions = append(mSessions, GuestSession{
+			IPAddress:  session.IPAddress,
+			GuestID:    session.GuestID,
+			Active:     session.Active,
+			LastActive: session.LastActive,
+			EndTime:    session.EndTime,
+		})
+	}
+
+	if err := db.Model(&GuestSession{}).Create(&mSessions).Error; err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // TODO: доделать
 func (d *GuestSessionRepository) GetCountActiveSessions(ctx context.Context, domain_id uint) (int64, error) {
 	db := getDB(ctx, d.db)
@@ -89,4 +110,13 @@ func (d *GuestSessionRepository) GetStaleSessions(ctx context.Context, limit int
 	}
 
 	return &dSessions, nil
+}
+
+func (d *GuestSessionRepository) CloseSessions(ctx context.Context, session_ids []uint) error {
+	db := getDB(ctx, d.db)
+
+	if err := db.Exec("UPDATE user_sessions SET active = false, end_time = NOW() WHERE id = ANY($1)", session_ids).Error; err != nil {
+		return err
+	}
+	return nil
 }

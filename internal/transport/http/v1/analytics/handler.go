@@ -33,6 +33,14 @@ type CollectEventRequest struct {
 	Data      map[string]interface{} `json:"data"`
 }
 
+func NewHandler(log *slog.Logger, events *analytics.CollectEventsUseCase, sessions *analytics.CreateGuestSessionUseCase) *Handler {
+	return &Handler{
+		log,
+		events,
+		sessions,
+	}
+}
+
 func (h *Handler) AddEvent(w http.ResponseWriter, r *http.Request) {
 	var req CollectEventsRequest
 	if err := render.Decode(r, &req); err != nil {
@@ -59,7 +67,7 @@ func (h *Handler) AddEvent(w http.ResponseWriter, r *http.Request) {
 		}
 		events = append(events, e)
 	}
-	
+
 	go h.events.Execute(r.Context(), &events)
 
 	w.WriteHeader(http.StatusOK)
