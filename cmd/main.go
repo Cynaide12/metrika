@@ -83,7 +83,7 @@ func main() {
 
 	go sessions_worker.StartSessionManager()
 
-	// setupMockGenerator(log, tracker, cfg, repos)
+	setupMockGenerator(log, tracker, cfg, repos)
 
 	log.Info("db connect succesful")
 
@@ -157,10 +157,8 @@ func setupRouter(cfg *config.Config, log *slog.Logger, tracker *tracker.Tracker,
 	analyticsHandler := analhandler.NewHandler(log, evuc, createsesuc)
 	authhandler.NewHandler(log, loginuc, refreshuc, registeruc)
 
-	// r.Get("/health", h.Health())
 	r.Post("/api/v1/events", analyticsHandler.AddEvent())
 	r.Post("/api/v1/sessions", analyticsHandler.CreateGuestSession())
-	// r.Get("/api/v1/metrika/{id}/sessions/online", h.GetCountActiveSessions())
 
 	log.Info("starting server", slog.String("address", srv.Addr))
 
