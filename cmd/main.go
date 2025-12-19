@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"metrika/internal/config"
 	"metrika/internal/domain/analytics"
+	"metrika/internal/domain/auth"
 	"metrika/internal/infrastructure/jwt"
 	"metrika/internal/infrastructure/logger"
 	"metrika/internal/infrastructure/mock"
@@ -27,12 +28,12 @@ import (
 )
 
 type repos struct {
-	domains        *analytics.DomainRepository
-	events         *postgres.EventsRepository
-	sessions       *postgres.SessionRepository
-	guests         *postgres.GuestsRepository
-	guest_sessions *postgres.GuestSessionRepository
-	users          *postgres.AuthRepository
+	domains        analytics.DomainRepository
+	events         analytics.EventsRepository
+	guests         analytics.GuestsRepository
+	guest_sessions analytics.GuestSessionRepository
+	sessions       auth.SessionRepository
+	users          auth.UserRepository
 }
 
 func main() {
@@ -59,28 +60,42 @@ func main() {
 
 	events := postgres.NewEventsRepository(db)
 	guest_sessions := postgres.NewGuestSessionRepository(db)
+	domains := postgres.NewDomainRepository(db)
+	sessions := postgres.NewSessionRepository(db)
+	guests := postgres.NewGuestsRepository(db)
+	users := postgres.NewAuthRepository(db)
 	tx := postgres.NewTxManager(db)
-	cleanup_stale_sessions_uc := analuc.NewCleanupBatchSessionsUseCase(log, guest_sessions, tx)
+
+	repos := repos{
+		domains:        domains,
+		events:         events,
+		sessions:       sessions,
+		guests:         guests,
+		guest_sessions: guest_sessions,
+		users:          users,
+	}
 
 	tracker := tracker.New(1000, time.Second*15, 10000, events)
+
+	cleanup_stale_sessions_uc := analuc.NewCleanupBatchSessionsUseCase(log, guest_sessions, tx)
 
 	sessions_worker := sessionworker.NewSessionsWorker(log, time.Second*15, cleanup_stale_sessions_uc)
 
 	go sessions_worker.StartSessionManager()
 
-	// setupMockGenerator(storage, log, tracker, cfg)
+	// setupMockGenerator(log, tracker, cfg, repos)
 
 	log.Info("db connect succesful")
 
 	log.Info("scheduler start succesful")
 
-	initRouter(cfg, log, storage, tracker)
+	setupRouter(cfg, log, tracker, tx, repos)
 }
 
 func setupMockGenerator(log *slog.Logger, tracker *tracker.Tracker, cfg *config.Config, repos repos) {
 	mockGenerator := mock.NewGenerator()
 	adapter := mock.MockServiceAdapter{Events: repos.events,
-		Domains:  *repos.domains,
+		Domains:  repos.domains,
 		Sessions: repos.guest_sessions,
 		Guests:   repos.guests}
 	mockService := mock.NewMockService(adapter, mockGenerator, log, tracker, cfg.MockConfig)
@@ -99,7 +114,7 @@ func setupLogRotation(rotate func()) {
 	c.Start()
 }
 
-func initRouter(cfg *config.Config, log *slog.Logger, tracker *tracker.Tracker, tx *postgres.TxManager, repos repos) {
+func setupRouter(cfg *config.Config, log *slog.Logger, tracker *tracker.Tracker, tx *postgres.TxManager, repos repos) {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -116,7 +131,7 @@ func initRouter(cfg *config.Config, log *slog.Logger, tracker *tracker.Tracker, 
 	}
 
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{"http://*", "https://*"},
+		AllowedOrigins: []string{"*"},
 		AllowedMethods: []string{
 			http.MethodHead,
 			http.MethodGet,
@@ -131,7 +146,7 @@ func initRouter(cfg *config.Config, log *slog.Logger, tracker *tracker.Tracker, 
 	}))
 
 	evuc := analuc.NewCollectEventsUseCase(repos.events, tracker, repos.guest_sessions, tx)
-	createsesuc := analuc.NewCreateGuestSessionUseCase(repos.guests, repos.guest_sessions, *repos.domains, log)
+	createsesuc := analuc.NewCreateGuestSessionUseCase(repos.guests, repos.guest_sessions, repos.domains, log)
 
 	tokens := jwt.NewJwtProvider(cfg.JWTSecret)
 
@@ -139,8 +154,13 @@ func initRouter(cfg *config.Config, log *slog.Logger, tracker *tracker.Tracker, 
 	refreshuc := authuc.NewRefreshUseCase(repos.sessions, tokens)
 	registeruc := authuc.NewRegisterUseCase(repos.users, repos.sessions, tokens)
 
-	analhandler.NewHandler(log, evuc, createsesuc)
+	analyticsHandler := analhandler.NewHandler(log, evuc, createsesuc)
 	authhandler.NewHandler(log, loginuc, refreshuc, registeruc)
+
+	// r.Get("/health", h.Health())
+	r.Post("/api/v1/events", analyticsHandler.AddEvent())
+	r.Post("/api/v1/sessions", analyticsHandler.CreateGuestSession())
+	// r.Get("/api/v1/metrika/{id}/sessions/online", h.GetCountActiveSessions())
 
 	log.Info("starting server", slog.String("address", srv.Addr))
 

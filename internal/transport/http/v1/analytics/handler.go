@@ -41,37 +41,39 @@ func NewHandler(log *slog.Logger, events *analytics.CollectEventsUseCase, sessio
 	}
 }
 
-func (h *Handler) AddEvent(w http.ResponseWriter, r *http.Request) {
-	var req CollectEventsRequest
-	if err := render.Decode(r, &req); err != nil {
-		http.Error(w, "bad request", http.StatusBadRequest)
-		return
-	}
-
-	if err := response.ValidateRequest(req); err != nil {
-		validateErr := err.(validator.ValidationErrors)
-		w.WriteHeader(http.StatusBadRequest)
-		render.JSON(w, r, response.ValidationError(validateErr))
-		return
-	}
-
-	var events []domain.Event
-	for _, event := range req.Events {
-		e := domain.Event{
-			SessionID: event.SessionID,
-			Type:      event.Type,
-			Element:   event.Element,
-			PageURL:   event.PageURL,
-			Timestamp: event.Timestamp,
-			Data:      event.Data,
+func (h *Handler) AddEvent() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req CollectEventsRequest
+		if err := render.Decode(r, &req); err != nil {
+			http.Error(w, "unable to decode request", http.StatusBadRequest)
+			return
 		}
-		events = append(events, e)
+
+		if err := response.ValidateRequest(req); err != nil {
+			validateErr := err.(validator.ValidationErrors)
+			w.WriteHeader(http.StatusBadRequest)
+			render.JSON(w, r, response.ValidationError(validateErr))
+			return
+		}
+
+		var events []domain.Event
+		for _, event := range req.Events {
+			e := domain.Event{
+				SessionID: event.SessionID,
+				Type:      event.Type,
+				Element:   event.Element,
+				PageURL:   event.PageURL,
+				Timestamp: event.Timestamp,
+				Data:      event.Data,
+			}
+			events = append(events, e)
+		}
+
+		go h.events.Execute(r.Context(), &events)
+
+		w.WriteHeader(http.StatusOK)
+		render.JSON(w, r, response.OK())
 	}
-
-	go h.events.Execute(r.Context(), &events)
-
-	w.WriteHeader(http.StatusOK)
-	render.JSON(w, r, response.OK())
 }
 
 type CreateNewSessionRequest struct {
@@ -83,33 +85,35 @@ type CreateNewSessionResponse struct {
 	SessionId uint `json:"m_s_id"`
 }
 
-func (h *Handler) CreateGuestSession(w http.ResponseWriter, r *http.Request) {
-	var req CreateNewSessionRequest
-	if err := render.Decode(r, &req); err != nil {
-		http.Error(w, "bad request", http.StatusBadRequest)
-		return
+func (h *Handler) CreateGuestSession() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req CreateNewSessionRequest
+		if err := render.Decode(r, &req); err != nil {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+
+		if err := response.ValidateRequest(req); err != nil {
+			validateErr := err.(validator.ValidationErrors)
+			w.WriteHeader(http.StatusBadRequest)
+			render.JSON(w, r, response.ValidationError(validateErr))
+			return
+		}
+
+		logger := h.log.With("fingerprint_id", req.FingerprintID)
+
+		ipAddress := r.Header.Get("X-Forwarded-For")
+
+		//TODO: не забыть реализовать разные домены
+		session, err := h.sessions.Execute(r.Context(), req.FingerprintID, ipAddress, "test.ru")
+		if err != nil {
+			logger.Error("ошибка создания гостевой сессии", sl.Err(err))
+		}
+
+		w.WriteHeader(http.StatusCreated)
+		render.JSON(w, r, CreateNewSessionResponse{
+			UserId:    session.GuestID,
+			SessionId: session.ID,
+		})
 	}
-
-	if err := response.ValidateRequest(req); err != nil {
-		validateErr := err.(validator.ValidationErrors)
-		w.WriteHeader(http.StatusBadRequest)
-		render.JSON(w, r, response.ValidationError(validateErr))
-		return
-	}
-
-	logger := h.log.With("fingerprint_id", req.FingerprintID)
-
-	ipAddress := r.Header.Get("X-Forwarded-For")
-
-	//TODO: не забыть реализовать разные домены
-	session, err := h.sessions.Execute(r.Context(), req.FingerprintID, ipAddress, "test.ru")
-	if err != nil {
-		logger.Error("ошибка создания гостевой сессии", sl.Err(err))
-	}
-
-	w.WriteHeader(http.StatusCreated)
-	render.JSON(w, r, CreateNewSessionResponse{
-		UserId:    session.GuestID,
-		SessionId: session.ID,
-	})
 }

@@ -57,5 +57,7 @@ func (gc *CreateGuestSessionUseCase) Execute(ctx context.Context, FingerprintID,
 		return nil, err
 	}
 
+	gc.logger.Debug("SESSION", slog.Any("session", session))
+
 	return &session, nil
 }

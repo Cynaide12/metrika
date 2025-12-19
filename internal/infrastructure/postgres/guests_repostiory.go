@@ -42,7 +42,7 @@ func (r *GuestsRepository) FirstOrCreate(ctx context.Context, fingerprint string
 	return &domain.Guest{DomainID: domain_id, Fingerprint: fingerprint, ID: mGuest.ID}, nil
 }
 
-func (r *GuestsRepository) CreateGuests(ctx context.Context, guests *[]domain.Guest) (error) {
+func (r *GuestsRepository) CreateGuests(ctx context.Context, guests *[]domain.Guest) ([]domain.Guest, error) {
 	db := getDB(ctx, r.db)
 
 	var mGuests []Guest
@@ -54,8 +54,17 @@ func (r *GuestsRepository) CreateGuests(ctx context.Context, guests *[]domain.Gu
 	}
 
 	if err := db.Model(&Guest{}).Create(&mGuests).Error; err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	var dGuests []domain.Guest
+	for _, guest := range mGuests{
+		dGuests = append(dGuests, domain.Guest{
+			ID: guest.ID,
+			DomainID: guest.DomainID,
+			Fingerprint: guest.Fingerprint,
+		})
+	}
+
+	return dGuests, nil
 }

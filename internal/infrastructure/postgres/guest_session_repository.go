@@ -27,7 +27,7 @@ func (d *GuestSessionRepository) Create(ctx context.Context, session *domain.Gue
 		EndTime:    session.EndTime,
 	}
 
-	if err := db.Model(&Guest{}).Create(&mSessions).Error; err != nil {
+	if err := db.Model(&GuestSession{}).Create(&mSessions).Error; err != nil {
 		return err
 	}
 
@@ -36,7 +36,7 @@ func (d *GuestSessionRepository) Create(ctx context.Context, session *domain.Gue
 	return nil
 }
 
-func (d *GuestSessionRepository) CreateSessions(ctx context.Context, sessions *[]domain.GuestSession) error {
+func (d *GuestSessionRepository) CreateSessions(ctx context.Context, sessions *[]domain.GuestSession) ([]domain.GuestSession, error) {
 	db := getDB(ctx, d.db)
 
 	var mSessions []GuestSession
@@ -51,10 +51,22 @@ func (d *GuestSessionRepository) CreateSessions(ctx context.Context, sessions *[
 	}
 
 	if err := db.Model(&GuestSession{}).Create(&mSessions).Error; err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	var dDessions []domain.GuestSession
+	for _, session := range mSessions {
+		dDessions = append(dDessions, domain.GuestSession{
+			ID:         session.ID,
+			IPAddress:  session.IPAddress,
+			GuestID:    session.GuestID,
+			Active:     session.Active,
+			LastActive: session.LastActive,
+			EndTime:    session.EndTime,
+		})
+	}
+
+	return dDessions, nil
 }
 
 // TODO: доделать

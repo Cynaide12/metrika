@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	domain "metrika/internal/domain/analytics"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -18,18 +19,29 @@ func NewEventsRepository(db *gorm.DB) *EventsRepository {
 func (d *EventsRepository) SaveEvents(ctx context.Context, events *[]domain.Event) error {
 	db := getDB(ctx, d.db)
 
-	if err := db.Model(Event{}).Create(&events).Error; err != nil {
+	var mEvents []Event
+	for _, event := range *events {
+		mEvents = append(mEvents, Event{
+			SessionID: event.SessionID,
+			Type:      event.Type,
+			Element:   event.Element,
+			PageURL:   event.PageURL,
+			Timestamp: event.Timestamp,
+		})
+	}
+
+	if err := db.Model(&Event{}).Create(&mEvents).Error; err != nil {
 		return err
 	}
 
-	ids := make(map[uint]struct{})
+	var ids []uint
 	for _, e := range *events {
-		ids[e.SessionID] = struct{}{}
+		ids = append(ids, e.ID)
 	}
 
-	// if err := db.Model(&GuestSession{}).Where("active = true AND id IN ?", ids).Updates(&GuestSession{LastActive: time.Now()}).Error; err != nil {
-	// 	return err
-	// }
+	if err := db.Model(&GuestSession{}).Where("active = true AND id IN ?", ids).Updates(&GuestSession{LastActive: time.Now()}).Error; err != nil {
+		return err
+	}
 
 	return nil
 }

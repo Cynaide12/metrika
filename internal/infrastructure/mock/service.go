@@ -33,10 +33,10 @@ type MockServiceAdapter struct {
 	// GetDomainGuests(ctx context.Context, domainId uint) ([]domain.Guest, error)
 	// GetCountDomainGuests(ctx context.Context, domainid uint) (int64, error)
 	// ByURL(ctx context.Context, url string) (domain.Domain, error)
-	Events domain.EventsRepository
-	Guests domain.GuestsRepository
+	Events   domain.EventsRepository
+	Guests   domain.GuestsRepository
 	Sessions domain.GuestSessionRepository
-	Domains domain.DomainRepository
+	Domains  domain.DomainRepository
 }
 
 func NewMockService(adapter MockServiceAdapter, generator *Generator, log *slog.Logger, tracker *tracker.Tracker, mcfg config.MockGenerator) *MockService {
@@ -74,7 +74,7 @@ func (m MockService) seedMockData() (mockDomainId uint, mockGuestsIds []uint, mo
 
 	if errors.Is(err, domain.ErrDomainNotFound) {
 		//добавляем моковый домен
-		if err := m.adapter.Domains.AddDomain(ctx, domain.Domain{SiteURL: mockDomainUrl}); err != nil {
+		if _, err := m.adapter.Domains.AddDomain(ctx, mockDomainUrl); err != nil {
 			return 0, mockGuestsIds, mockSessionIds, err
 		}
 	}
@@ -91,12 +91,12 @@ func (m MockService) seedMockData() (mockDomainId uint, mockGuestsIds []uint, mo
 		sessions = append(sessions, *m.generator.GenerateMockGuestSession(id))
 	}
 
-	if err := m.adapter.Sessions.CreateSessions(ctx, &sessions); err != nil {
+	newSessions, err := m.adapter.Sessions.CreateSessions(ctx, &sessions)
+	if err != nil {
 		return 0, mockGuestsIds, mockSessionIds, err
 	}
 
-	//TODO: НЕ ЗАБЫТЬ ЧТО В МАССИВ НИКАКИЕ ID НЕ ЗАПИСЫВАЮТСЯ НАДО ДОРАБОТРАТЬ ФУНКИЮ CREATESESSIONS В РЕПОЗИТОРИИ
-	for _, session := range sessions {
+	for _, session := range newSessions {
 		mockSessionIds = append(mockSessionIds, session.ID)
 	}
 
@@ -119,21 +119,21 @@ func (m MockService) initMockGuests(ctx context.Context, mockDomainId uint) ([]u
 			mockGuestsToAdd = append(mockGuestsToAdd, m.generator.GenerateMockGuest(mockDomainId))
 		}
 
-	//TODO: НЕ ЗАБЫТЬ ЧТО В МАССИВ НИКАКИЕ ID НЕ ЗАПИСЫВАЮТСЯ НАДО ДОРАБОТРАТЬ ФУНКИЮ AddGuests В РЕПОЗИТОРИИ И ВАЩЕ НЕ ФАКТ ЧТО ЭТО НАДО!! ПРОВЕРИТЬ!!
+		//TODO: НЕ ЗАБЫТЬ ЧТО В МАССИВ НИКАКИЕ ID НЕ ЗАПИСЫВАЮТСЯ НАДО ДОРАБОТРАТЬ ФУНКИЮ AddGuests В РЕПОЗИТОРИИ И ВАЩЕ НЕ ФАКТ ЧТО ЭТО НАДО!! ПРОВЕРИТЬ!!
 		//добавляем юзеров
-		if err := m.adapter.Guests.CreateGuests(ctx, &mockGuestsToAdd); err != nil {
+		if _, err := m.adapter.Guests.CreateGuests(ctx, &mockGuestsToAdd); err != nil {
 			return mockGuestsIds, err
 		}
 	}
 
 	//получаем юзеров домена
-	mockGuests, err := m.adapter.Guests.GetDomainGuests(ctx, mockDomainId)
+	mockGuests, err := m.adapter.Domains.GetDomainGuests(ctx, mockDomainId)
 	if err != nil {
 		return mockGuestsIds, err
 	}
 
 	//собираем id
-	for _, guest := range mockGuests {
+	for _, guest := range *mockGuests {
 		mockGuestsIds = append(mockGuestsIds, guest.ID)
 	}
 

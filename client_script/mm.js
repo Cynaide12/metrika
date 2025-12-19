@@ -3443,6 +3443,7 @@ const getElementSelector = (element) => {
 const setupListeners = async () => {
   const mm = await new Metrika({ baseUrl: 'http://localhost:8081/api/v1' });
 
+
   document.addEventListener('click', (e) => {
     const element = e.target;
     const selector = getElementSelector(element);

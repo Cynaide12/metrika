@@ -35,7 +35,7 @@ func New(batchSize int, interval time.Duration, buferSize int64, handler Storage
 
 func (r *Tracker) saver() {
 	ticker := time.NewTicker(r.Interval)
-	batch := make([]domain.Event,0, r.BatchSize)
+	batch := make([]domain.Event, 0, r.BatchSize)
 
 	ctx := context.Background()
 
@@ -49,10 +49,10 @@ func (r *Tracker) saver() {
 				batch = batch[:0]
 			}
 		case <-ticker.C:
-			if len(batch) > 0{
+			if len(batch) > 0 {
 				log.Println("СОХРАНЯЮ ИВЕНТ")
-			r.handler.SaveEvents(ctx, &batch)
-			batch = batch[:0]
+				r.handler.SaveEvents(ctx, &batch)
+				batch = batch[:0]
 			}
 		}
 	}
