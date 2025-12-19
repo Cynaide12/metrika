@@ -3,13 +3,20 @@ package main
 import (
 	"log/slog"
 	"metrika/internal/config"
-	"metrika/internal/http-server/handlers"
-	"metrika/internal/logger"
-	"metrika/internal/mock"
-	"metrika/internal/repository"
-	"metrika/internal/service"
-	"metrika/internal/tracker"
-	"metrika/lib/logger/sl"
+	"metrika/internal/domain/analytics"
+	"metrika/internal/domain/auth"
+	"metrika/internal/infrastructure/jwt"
+	"metrika/internal/infrastructure/logger"
+	"metrika/internal/infrastructure/mock"
+	"metrika/internal/infrastructure/postgres"
+	sessionworker "metrika/internal/infrastructure/session_worker"
+	"metrika/internal/infrastructure/tracker"
+	analhandler "metrika/internal/transport/http/v1/analytics"
+	authhandler "metrika/internal/transport/http/v1/auth"
+	analuc "metrika/internal/usecase/analytics"
+	authuc "metrika/internal/usecase/auth"
+	"metrika/pkg/logger/sl"
+
 	"net/http"
 	"os"
 	"time"
@@ -20,7 +27,14 @@ import (
 	"github.com/robfig/cron/v3"
 )
 
-//TODO: сделать инит роутов и можно попробовать написать генератор моковых данных
+type repos struct {
+	domains        analytics.DomainRepository
+	events         analytics.EventsRepository
+	guests         analytics.GuestsRepository
+	guest_sessions analytics.GuestSessionRepository
+	sessions       auth.SessionRepository
+	users          auth.UserRepository
+}
 
 func main() {
 	cfg := config.MustLoad()
@@ -38,27 +52,56 @@ func main() {
 
 	log.Info("logs rotation are enabled")
 
-	storage, err := repository.New(cfg)
+	db, err := postgres.New(cfg)
 	if err != nil {
 		log.Error("failed connect to db", sl.Err(err))
 		os.Exit(1)
 	}
 
-	tracker := tracker.New(1000, time.Second, 10000, storage)
-	mockGenerator := mock.New(time.Second, 1000, log, 2500, 10000, 5000, tracker)
+	events := postgres.NewEventsRepository(db)
+	guest_sessions := postgres.NewGuestSessionRepository(db)
+	domains := postgres.NewDomainRepository(db)
+	sessions := postgres.NewSessionRepository(db)
+	guests := postgres.NewGuestsRepository(db)
+	users := postgres.NewAuthRepository(db)
+	tx := postgres.NewTxManager(db)
 
-	//генерация моковых данных
-	go mockGenerator.StartEventsGenerator()
+	repos := repos{
+		domains:        domains,
+		events:         events,
+		sessions:       sessions,
+		guests:         guests,
+		guest_sessions: guest_sessions,
+		users:          users,
+	}
 
-	
+	tracker := tracker.New(1000, time.Second*15, 10000, events)
+
+	cleanup_stale_sessions_uc := analuc.NewCleanupBatchSessionsUseCase(log, guest_sessions, tx)
+
+	sessions_worker := sessionworker.NewSessionsWorker(log, time.Second*15, cleanup_stale_sessions_uc)
+
+	go sessions_worker.StartSessionManager()
+
+	setupMockGenerator(log, tracker, cfg, repos)
 
 	log.Info("db connect succesful")
 
 	log.Info("scheduler start succesful")
 
-	initRouter(cfg, log, storage, tracker)
+	setupRouter(cfg, log, tracker, tx, repos)
 }
 
+func setupMockGenerator(log *slog.Logger, tracker *tracker.Tracker, cfg *config.Config, repos repos) {
+	mockGenerator := mock.NewGenerator()
+	adapter := mock.MockServiceAdapter{Events: repos.events,
+		Domains:  repos.domains,
+		Sessions: repos.guest_sessions,
+		Guests:   repos.guests}
+	mockService := mock.NewMockService(adapter, mockGenerator, log, tracker, cfg.MockConfig)
+
+	go mockService.StartEventsGenerator()
+}
 
 func setupLogRotation(rotate func()) {
 	//запускаем ротацию логов каждые сутки
@@ -71,7 +114,7 @@ func setupLogRotation(rotate func()) {
 	c.Start()
 }
 
-func initRouter(cfg *config.Config, log *slog.Logger, storage *repository.Repository, tracker *tracker.Tracker) {
+func setupRouter(cfg *config.Config, log *slog.Logger, tracker *tracker.Tracker, tx *postgres.TxManager, repos repos) {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -88,7 +131,7 @@ func initRouter(cfg *config.Config, log *slog.Logger, storage *repository.Reposi
 	}
 
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{"http://*", "https://*"},
+		AllowedOrigins: []string{"*"},
 		AllowedMethods: []string{
 			http.MethodHead,
 			http.MethodGet,
@@ -102,9 +145,20 @@ func initRouter(cfg *config.Config, log *slog.Logger, storage *repository.Reposi
 		Debug:            true,
 	}))
 
-	ms := service.New(storage, log, tracker)
+	evuc := analuc.NewCollectEventsUseCase(repos.events, tracker, repos.guest_sessions, tx)
+	createsesuc := analuc.NewCreateGuestSessionUseCase(repos.guests, repos.guest_sessions, repos.domains, log)
 
-	handlers.New(log, ms, r)
+	tokens := jwt.NewJwtProvider(cfg.JWTSecret)
+
+	loginuc := authuc.NewLoginUseCase(repos.users, repos.sessions, tokens)
+	refreshuc := authuc.NewRefreshUseCase(repos.sessions, tokens)
+	registeruc := authuc.NewRegisterUseCase(repos.users, repos.sessions, tokens)
+
+	analyticsHandler := analhandler.NewHandler(log, evuc, createsesuc)
+	authhandler.NewHandler(log, loginuc, refreshuc, registeruc)
+
+	r.Post("/api/v1/events", analyticsHandler.AddEvent())
+	r.Post("/api/v1/sessions", analyticsHandler.CreateGuestSession())
 
 	log.Info("starting server", slog.String("address", srv.Addr))
 
