@@ -37,9 +37,9 @@ func (ec *CollectEventsUseCase) Execute(
 			return err
 		}
 
-		ids := make(map[uint]struct{})
+		var ids []uint
 		for _, e := range *events {
-			ids[e.SessionID] = struct{}{}
+			ids = append(ids, e.SessionID)
 		}
 
 		//TODO:учесть что с момента отправки задачи в очередь на сохранение может пройти много времени

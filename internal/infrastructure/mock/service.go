@@ -66,15 +66,17 @@ func (m MockService) seedMockData() (mockDomainId uint, mockGuestsIds []uint, mo
 
 	ctx := context.Background()
 
+	var dom *domain.Domain
+
 	//проверяем наличие мокового домена
-	dom, err := m.adapter.Domains.ByURL(ctx, mockDomainUrl)
+	dom, err = m.adapter.Domains.ByURL(ctx, mockDomainUrl)
 	if err != nil && !errors.Is(err, domain.ErrDomainNotFound) {
 		return 0, mockGuestsIds, mockSessionIds, err
 	}
 
 	if errors.Is(err, domain.ErrDomainNotFound) {
 		//добавляем моковый домен
-		if _, err := m.adapter.Domains.AddDomain(ctx, mockDomainUrl); err != nil {
+		if dom, err = m.adapter.Domains.AddDomain(ctx, mockDomainUrl); err != nil {
 			return 0, mockGuestsIds, mockSessionIds, err
 		}
 	}

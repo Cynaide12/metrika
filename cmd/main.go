@@ -83,7 +83,7 @@ func main() {
 
 	go sessions_worker.StartSessionManager()
 
-	setupMockGenerator(log, tracker, cfg, repos)
+	// setupMockGenerator(log, tracker, cfg, repos)
 
 	log.Info("db connect succesful")
 
@@ -146,7 +146,7 @@ func setupRouter(cfg *config.Config, log *slog.Logger, tracker *tracker.Tracker,
 	}))
 
 	evuc := analuc.NewCollectEventsUseCase(repos.events, tracker, repos.guest_sessions, tx)
-	createsesuc := analuc.NewCreateGuestSessionUseCase(repos.guests, repos.guest_sessions, repos.domains, log)
+	createsesuc := analuc.NewGetGuestSessionUseCase(repos.guests, repos.guest_sessions, repos.domains, log)
 
 	tokens := jwt.NewJwtProvider(cfg.JWTSecret)
 
@@ -157,8 +157,16 @@ func setupRouter(cfg *config.Config, log *slog.Logger, tracker *tracker.Tracker,
 	analyticsHandler := analhandler.NewHandler(log, evuc, createsesuc)
 	authhandler.NewHandler(log, loginuc, refreshuc, registeruc)
 
-	r.Post("/api/v1/events", analyticsHandler.AddEvent())
-	r.Post("/api/v1/sessions", analyticsHandler.CreateGuestSession())
+	r.Route("/api/v1", func(r chi.Router) {
+		r.Route("/analytics", func(r chi.Router) {
+			r.Post("/events", analyticsHandler.AddEvent())
+			r.Post("/sessions", analyticsHandler.CreateGuestSession())
+		})
+		r.Route("/metrika", func(r chi.Router) {
+
+		})
+		
+	})
 
 	log.Info("starting server", slog.String("address", srv.Addr))
 

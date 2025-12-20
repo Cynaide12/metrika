@@ -1,6 +1,7 @@
 package analytics
 
 import (
+	"context"
 	"log/slog"
 	domain "metrika/internal/domain/analytics"
 	"metrika/internal/usecase/analytics"
@@ -17,7 +18,7 @@ import (
 type Handler struct {
 	log      *slog.Logger
 	events   *analytics.CollectEventsUseCase
-	sessions *analytics.CreateGuestSessionUseCase
+	sessions *analytics.GetGuestSessionUseCase
 }
 
 type CollectEventsRequest struct {
@@ -33,7 +34,7 @@ type CollectEventRequest struct {
 	Data      map[string]interface{} `json:"data"`
 }
 
-func NewHandler(log *slog.Logger, events *analytics.CollectEventsUseCase, sessions *analytics.CreateGuestSessionUseCase) *Handler {
+func NewHandler(log *slog.Logger, events *analytics.CollectEventsUseCase, sessions *analytics.GetGuestSessionUseCase) *Handler {
 	return &Handler{
 		log,
 		events,
@@ -69,7 +70,7 @@ func (h *Handler) AddEvent() http.HandlerFunc {
 			events = append(events, e)
 		}
 
-		go h.events.Execute(r.Context(), &events)
+		go h.events.Execute(context.Background(), &events)
 
 		w.WriteHeader(http.StatusOK)
 		render.JSON(w, r, response.OK())

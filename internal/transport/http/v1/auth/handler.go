@@ -36,39 +36,37 @@ type AuthResponse struct {
 	response.Response
 }
 
-func (h *Handler) Login() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		var req LoginRequest
-		if err := render.Decode(r, &req); err != nil {
-			http.Error(w, "bad request", http.StatusBadRequest)
-			return
-		}
-
-		if err := response.ValidateRequest(req); err != nil {
-			validateErr := err.(validator.ValidationErrors)
-			w.WriteHeader(http.StatusBadRequest)
-			render.JSON(w, r, response.ValidationError(validateErr))
-			return
-		}
-
-		tokens, err := h.login.Execute(
-			r.Context(),
-			req.Email,
-			req.Password,
-			r.UserAgent(),
-		)
-		if err != nil {
-			if errors.Is(err, domain.ErrInvalidCredentials) {
-				http.Error(w, "unauthorized", http.StatusUnauthorized)
-				return
-			}
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
-
-		h.jwt.SetCookie(w, tokens.Refresh)
-		render.JSON(w, r, AuthResponse{Token: tokens.Access})
+func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
+	var req LoginRequest
+	if err := render.Decode(r, &req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
 	}
+
+	if err := response.ValidateRequest(req); err != nil {
+		validateErr := err.(validator.ValidationErrors)
+		w.WriteHeader(http.StatusBadRequest)
+		render.JSON(w, r, response.ValidationError(validateErr))
+		return
+	}
+
+	tokens, err := h.login.Execute(
+		r.Context(),
+		req.Email,
+		req.Password,
+		r.UserAgent(),
+	)
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidCredentials) {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	h.jwt.SetCookie(w, tokens.Refresh)
+	render.JSON(w, r, AuthResponse{Token: tokens.Access})
 }
 
 type RegisterRequest struct {

@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	domain "metrika/internal/domain/analytics"
 	"time"
 
@@ -69,20 +70,92 @@ func (d *GuestSessionRepository) CreateSessions(ctx context.Context, sessions *[
 	return dDessions, nil
 }
 
-// TODO: доделать
 func (d *GuestSessionRepository) GetCountActiveSessions(ctx context.Context, domain_id uint) (int64, error) {
 	db := getDB(ctx, d.db)
 
 	var count int64
 
-	if err := db.Debug().Model(&domain.GuestSession{}).Exec("SELECT * FROM guest_sessions s LEFT JOIN guests u ON u.id=s.guest_id WHERE s.active = true AND u.domain_id=?", domain_id).Error; err != nil {
+	if err := db.Debug().Model(&domain.GuestSession{}).Exec("SELECT * FROM guest_sessions s LEFT JOIN guests u ON u.id=s.guest_id WHERE s.active = true AND u.domain_id=?", domain_id).Count(&count).Error; err != nil {
 		return 0, err
 	}
 
 	return count, nil
 }
 
-func (d *GuestSessionRepository) SetLastActive(ctx context.Context, session_ids map[uint]struct{}, last_active time.Time) error {
+//TODO: протестить
+func (d *GuestSessionRepository) ByRangeDate(ctx context.Context, opts domain.GuestSessionRepositoryByRangeDateOptions) (*[]domain.GuestSession, error) {
+	db := getDB(ctx, d.db)
+
+	var mSessions []GuestSession
+
+	query := db.Debug().Model(GuestSession{})
+
+	if opts.StartDate != nil {
+		query.Where("NOT created_at < ?", opts.StartDate)
+	}
+	if opts.EndDate != nil {
+		query.Where("NOT created_at > ?", opts.EndDate)
+	}
+	if opts.WithoutActive != nil {
+		query.Where("active = false")
+	}
+	if opts.GuestID != nil {
+		query.Where("guest_id = ?", opts.GuestID)
+	}
+	if opts.Limit != nil {
+		query.Limit(*opts.Limit)
+	}
+	if opts.Offset != nil {
+		query.Offset(*opts.Offset)
+	}
+
+	if err := query.Debug().Find(&mSessions).Error; err != nil {
+		if errors.Is(err, domain.ErrSessionsNotFound) {
+			return nil, domain.ErrSessionsNotFound
+		}
+		return nil, err
+	}
+
+	var sessions []domain.GuestSession
+
+	for _, session := range mSessions {
+		sessions = append(sessions, domain.GuestSession{
+			ID:         session.ID,
+			GuestID:    session.GuestID,
+			EndTime:    session.EndTime,
+			LastActive: session.LastActive,
+			Active:     session.Active,
+		})
+	}
+
+	return &sessions, nil
+}
+
+//TODO: протестить
+func (d *GuestSessionRepository) LastActiveByGuestId(ctx context.Context, guest_id uint) (*domain.GuestSession, error) {
+	db := getDB(ctx, d.db)
+
+	var mSession GuestSession
+
+	if err := db.Debug().Model(GuestSession{}).Where("active = true AND guest_id = ?", guest_id).Last(&mSession).Error; err != nil {
+		if errors.Is(err, domain.ErrLastActiveSessionNotFound) {
+			return nil, domain.ErrLastActiveSessionNotFound
+		}
+
+		return nil, err
+	}
+
+	session := domain.GuestSession{ID: mSession.ID,
+		GuestID:    mSession.GuestID,
+		IPAddress:  mSession.IPAddress,
+		LastActive: mSession.LastActive,
+		EndTime:    mSession.EndTime,
+	}
+
+	return &session, nil
+}
+
+func (d *GuestSessionRepository) SetLastActive(ctx context.Context, session_ids []uint, last_active time.Time) error {
 
 	db := getDB(ctx, d.db)
 

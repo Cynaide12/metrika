@@ -14,13 +14,25 @@ type GuestsRepository interface {
 	CreateGuests(ctx context.Context, guests *[]Guest) ([]Guest, error)
 }
 
+type GuestSessionRepositoryByRangeDateOptions struct {
+	StartDate     *time.Time
+	EndDate       *time.Time
+	GuestID       *uint
+	DomainId      uint
+	Limit         *int
+	Offset        *int
+	WithoutActive *bool
+}
+
 type GuestSessionRepository interface {
 	Create(ctx context.Context, session *GuestSession) error
 	GetCountActiveSessions(ctx context.Context, domain_id uint) (int64, error)
-	SetLastActive(ctx context.Context, session_ids map[uint]struct{}, last_active time.Time) error
+	SetLastActive(ctx context.Context, session_ids []uint, last_active time.Time) error
 	GetStaleSessions(ctx context.Context, limit int) (*[]GuestSession, error)
 	CloseSessions(ctx context.Context, session_ids []uint) error
+	ByRangeDate(ctx context.Context, opts GuestSessionRepositoryByRangeDateOptions) (*[]GuestSession, error)
 	CreateSessions(ctx context.Context, sessions *[]GuestSession) ([]GuestSession, error)
+	LastActiveByGuestId(ctx context.Context, guest_id uint) (*GuestSession, error)
 }
 
 type DomainRepository interface {
