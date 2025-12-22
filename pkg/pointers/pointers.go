@@ -1,5 +1,7 @@
 package pointers
 
+import "time"
+
 func NewBoolPointer(b bool) *bool {
 	return &b
 }
@@ -10,4 +12,8 @@ func NewIntPointer(i int) *int {
 
 func NewUintPointer(u uint) *uint {
 	return &u
+}
+
+func NewTimePointer(t time.Time) *time.Time{
+	return &t
 }

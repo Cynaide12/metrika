@@ -31,7 +31,6 @@ func (ec *CollectEventsUseCase) Execute(
 	ctx context.Context,
 	events *[]domain.Event,
 ) error {
-	// ec.tracker.TrackEvent(event)
 	return ec.tx.WithinTransaction(ctx, func(ctx context.Context) error {
 		if err := ec.events.SaveEvents(ctx, events); err != nil {
 			return err
