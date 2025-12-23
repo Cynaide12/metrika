@@ -18,7 +18,6 @@ type GuestSessionRepositoryByRangeDateOptions struct {
 	StartDate     *time.Time
 	EndDate       *time.Time
 	GuestID       *uint
-	DomainId      uint
 	Limit         *int
 	Offset        *int
 	WithoutActive *bool

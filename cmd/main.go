@@ -13,8 +13,10 @@ import (
 	"metrika/internal/infrastructure/tracker"
 	analhandler "metrika/internal/transport/http/v1/analytics"
 	authhandler "metrika/internal/transport/http/v1/auth"
+	methandler "metrika/internal/transport/http/v1/metrika"
 	analuc "metrika/internal/usecase/analytics"
 	authuc "metrika/internal/usecase/auth"
+	"metrika/internal/usecase/metrika"
 	"metrika/pkg/logger/sl"
 
 	"net/http"
@@ -79,7 +81,7 @@ func main() {
 
 	cleanup_stale_sessions_uc := analuc.NewCleanupBatchSessionsUseCase(log, guest_sessions, tx)
 
-	sessions_worker := sessionworker.NewSessionsWorker(log, time.Second*15, cleanup_stale_sessions_uc)
+	sessions_worker := sessionworker.NewSessionsWorker(log, time.Second*15, cleanup_stale_sessions_uc, make(chan struct{}))
 
 	go sessions_worker.StartSessionManager()
 
@@ -153,19 +155,29 @@ func setupRouter(cfg *config.Config, log *slog.Logger, tracker *tracker.Tracker,
 	loginuc := authuc.NewLoginUseCase(repos.users, repos.sessions, tokens)
 	refreshuc := authuc.NewRefreshUseCase(repos.sessions, tokens)
 	registeruc := authuc.NewRegisterUseCase(repos.users, repos.sessions, tokens)
+	guestSessionsByRangeDateuc := metrika.NewSessionsByRangeDateUseCase(repos.guest_sessions)
+	activeSessionsuc := metrika.NewAciveSessionsUseCase(log, repos.guest_sessions)
 
 	analyticsHandler := analhandler.NewHandler(log, evuc, createsesuc)
-	authhandler.NewHandler(log, loginuc, refreshuc, registeruc)
+	authorizationHandler := authhandler.NewHandler(log, loginuc, refreshuc, registeruc)
+	metrikaHandler := methandler.NewHandler(log, guestSessionsByRangeDateuc, activeSessionsuc)
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Route("/analytics", func(r chi.Router) {
-			r.Post("/events", analyticsHandler.AddEvent())
-			r.Post("/sessions", analyticsHandler.CreateGuestSession())
+			r.Post("/events", analyticsHandler.AddEvent)
+			r.Post("/sessions", analyticsHandler.CreateGuestSession)
 		})
 		r.Route("/metrika", func(r chi.Router) {
-
+			r.Route("/{domain_id}", func(r chi.Router) {
+				r.Get("/guests/visits", metrikaHandler.GetGuestSessionByRangeDate)
+				r.Get("/guests/online", metrikaHandler.GetCountActiveSessions)
+			})
+			r.Route("/auth", func(r chi.Router) {
+				r.Post("/login", authorizationHandler.Login)
+				r.Post("/refresh", authorizationHandler.Refresh)
+			})
 		})
-		
+
 	})
 
 	log.Info("starting server", slog.String("address", srv.Addr))

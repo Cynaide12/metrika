@@ -26,9 +26,6 @@ func (ec *SessionsByRangeDateUseCase) Execute(
 	if opts.Limit == nil {
 		opts.Limit = pointers.NewIntPointer(1000)
 	}
-	if opts.DomainId == 0 {
-		opts.DomainId = domain_id
-	}
 
 	return ec.sessions.ByRangeDate(ctx, *opts)
 }

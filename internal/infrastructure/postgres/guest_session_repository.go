@@ -73,16 +73,16 @@ func (d *GuestSessionRepository) CreateSessions(ctx context.Context, sessions *[
 func (d *GuestSessionRepository) GetCountActiveSessions(ctx context.Context, domain_id uint) (int64, error) {
 	db := getDB(ctx, d.db)
 
-	var count int64
 
-	if err := db.Debug().Model(&domain.GuestSession{}).Exec("SELECT * FROM guest_sessions s LEFT JOIN guests u ON u.id=s.guest_id WHERE s.active = true AND u.domain_id=?", domain_id).Count(&count).Error; err != nil {
-		return 0, err
+	res := db.Exec("SELECT * FROM guest_sessions s LEFT JOIN guests u ON u.id=s.guest_id WHERE s.active = true AND u.domain_id=?", domain_id);
+
+	if res.Error != nil {
+		return 0, res.Error
 	}
 
-	return count, nil
+	return res.RowsAffected, nil
 }
 
-//TODO: протестить
 func (d *GuestSessionRepository) ByRangeDate(ctx context.Context, opts domain.GuestSessionRepositoryByRangeDateOptions) (*[]domain.GuestSession, error) {
 	db := getDB(ctx, d.db)
 
@@ -109,7 +109,7 @@ func (d *GuestSessionRepository) ByRangeDate(ctx context.Context, opts domain.Gu
 		query.Offset(*opts.Offset)
 	}
 
-	if err := query.Debug().Find(&mSessions).Error; err != nil {
+	if err := query.Order("id ASC").Debug().Find(&mSessions).Error; err != nil {
 		if errors.Is(err, domain.ErrSessionsNotFound) {
 			return nil, domain.ErrSessionsNotFound
 		}
@@ -131,7 +131,7 @@ func (d *GuestSessionRepository) ByRangeDate(ctx context.Context, opts domain.Gu
 	return &sessions, nil
 }
 
-//TODO: протестить
+// TODO: протестить
 func (d *GuestSessionRepository) LastActiveByGuestId(ctx context.Context, guest_id uint) (*domain.GuestSession, error) {
 	db := getDB(ctx, d.db)
 
@@ -200,7 +200,7 @@ func (d *GuestSessionRepository) GetStaleSessions(ctx context.Context, limit int
 func (d *GuestSessionRepository) CloseSessions(ctx context.Context, session_ids []uint) error {
 	db := getDB(ctx, d.db)
 
-	if err := db.Exec("UPDATE user_sessions SET active = false, end_time = NOW() WHERE id = ANY($1)", session_ids).Error; err != nil {
+	if err := db.Exec("UPDATE guest_sessions SET active = false, end_time = NOW() WHERE id = ANY($1)", session_ids).Error; err != nil {
 		return err
 	}
 	return nil

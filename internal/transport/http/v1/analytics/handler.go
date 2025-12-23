@@ -42,8 +42,7 @@ func NewHandler(log *slog.Logger, events *analytics.CollectEventsUseCase, sessio
 	}
 }
 
-func (h *Handler) AddEvent() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) AddEvent(w http.ResponseWriter, r *http.Request) {
 		var req CollectEventsRequest
 		if err := render.Decode(r, &req); err != nil {
 			http.Error(w, "unable to decode request", http.StatusBadRequest)
@@ -75,7 +74,7 @@ func (h *Handler) AddEvent() http.HandlerFunc {
 		w.WriteHeader(http.StatusOK)
 		render.JSON(w, r, response.OK())
 	}
-}
+
 
 type CreateNewSessionRequest struct {
 	FingerprintID string `json:"f_id"`
@@ -86,8 +85,7 @@ type CreateNewSessionResponse struct {
 	SessionId uint `json:"m_s_id"`
 }
 
-func (h *Handler) CreateGuestSession() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) CreateGuestSession(w http.ResponseWriter, r *http.Request) {
 		var req CreateNewSessionRequest
 		if err := render.Decode(r, &req); err != nil {
 			http.Error(w, "bad request", http.StatusBadRequest)
@@ -117,4 +115,4 @@ func (h *Handler) CreateGuestSession() http.HandlerFunc {
 			SessionId: session.ID,
 		})
 	}
-}
+
