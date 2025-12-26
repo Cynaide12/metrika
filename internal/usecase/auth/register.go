@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"log/slog"
 	domain "metrika/internal/domain/auth"
 )
 
@@ -9,14 +10,16 @@ type RegisterUseCase struct {
 	users    domain.UserRepository
 	sessions domain.SessionRepository
 	tokens   TokenProvider
+	logger *slog.Logger
 }
 
 func NewRegisterUseCase(
 	users domain.UserRepository,
 	sessions domain.SessionRepository,
 	tokens TokenProvider,
+	logger *slog.Logger,
 ) *RegisterUseCase {
-	return &RegisterUseCase{users, sessions, tokens}
+	return &RegisterUseCase{users, sessions, tokens, logger}
 }
 
 func (uc *RegisterUseCase) Execute(
@@ -49,6 +52,7 @@ func (uc *RegisterUseCase) Execute(
 	if err := uc.users.CreateUser(ctx, &auser); err != nil {
 		return nil, err
 	}
+
 
 	//создаем сессию для юзера
 	session := &domain.Session{

@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	domain "metrika/internal/domain/auth"
 
 	"gorm.io/gorm"
@@ -64,4 +65,17 @@ func (r *SessionRepository) Update(
 		Where("id = ?", s.ID).
 		Update("refresh_token", s.RefreshToken).
 		Error
+}
+
+func (r SessionRepository) Delete(ctx context.Context, id uint) error {
+	db := getDB(ctx, r.db)
+
+	if err := db.Model(&UserSession{}).Where("id = ?", id).Delete(&UserSession{}).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domain.ErrSessionNotFound
+		}
+		return err
+	}
+
+	return nil
 }

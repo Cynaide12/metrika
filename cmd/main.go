@@ -14,6 +14,7 @@ import (
 	analhandler "metrika/internal/transport/http/v1/analytics"
 	authhandler "metrika/internal/transport/http/v1/auth"
 	methandler "metrika/internal/transport/http/v1/metrika"
+	mid "metrika/internal/transport/http/v1/middleware"
 	analuc "metrika/internal/usecase/analytics"
 	authuc "metrika/internal/usecase/auth"
 	"metrika/internal/usecase/metrika"
@@ -133,7 +134,7 @@ func setupRouter(cfg *config.Config, log *slog.Logger, tracker *tracker.Tracker,
 	}
 
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{"*"},
+		AllowedOrigins: []string{"http://*, https://", "http://localhost:3000"},
 		AllowedMethods: []string{
 			http.MethodHead,
 			http.MethodGet,
@@ -154,7 +155,7 @@ func setupRouter(cfg *config.Config, log *slog.Logger, tracker *tracker.Tracker,
 
 	loginuc := authuc.NewLoginUseCase(repos.users, repos.sessions, tokens)
 	refreshuc := authuc.NewRefreshUseCase(repos.sessions, tokens)
-	registeruc := authuc.NewRegisterUseCase(repos.users, repos.sessions, tokens)
+	registeruc := authuc.NewRegisterUseCase(repos.users, repos.sessions, tokens, log)
 	guestSessionsByRangeDateuc := metrika.NewSessionsByRangeDateUseCase(repos.guest_sessions)
 	activeSessionsuc := metrika.NewAciveSessionsUseCase(log, repos.guest_sessions)
 
@@ -162,20 +163,27 @@ func setupRouter(cfg *config.Config, log *slog.Logger, tracker *tracker.Tracker,
 	authorizationHandler := authhandler.NewHandler(log, loginuc, refreshuc, registeruc)
 	metrikaHandler := methandler.NewHandler(log, guestSessionsByRangeDateuc, activeSessionsuc)
 
+	jwtProvider := jwt.NewJwtProvider(cfg.JWTSecret)
+
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Route("/analytics", func(r chi.Router) {
-			r.Post("/events", analyticsHandler.AddEvent)
-			r.Post("/sessions", analyticsHandler.CreateGuestSession)
+		r.Group(func(r chi.Router) {
+			r.Use(mid.AuthMiddleware(log, cfg.JWTSecret, *cfg, *jwtProvider))
+			r.Route("/analytics", func(r chi.Router) {
+				r.Post("/events", analyticsHandler.AddEvent)
+				r.Post("/sessions", analyticsHandler.CreateGuestSession)
+			})
+			r.Route("/metrika", func(r chi.Router) {
+				r.Route("/{domain_id}", func(r chi.Router) {
+					r.Get("/guests/visits", metrikaHandler.GetGuestSessionByRangeDate)
+					r.Get("/guests/online", metrikaHandler.GetCountActiveSessions)
+				})
+			})
 		})
-		r.Route("/metrika", func(r chi.Router) {
-			r.Route("/{domain_id}", func(r chi.Router) {
-				r.Get("/guests/visits", metrikaHandler.GetGuestSessionByRangeDate)
-				r.Get("/guests/online", metrikaHandler.GetCountActiveSessions)
-			})
-			r.Route("/auth", func(r chi.Router) {
-				r.Post("/login", authorizationHandler.Login)
-				r.Post("/refresh", authorizationHandler.Refresh)
-			})
+		r.Route("/auth", func(r chi.Router) {
+			r.Post("/login", authorizationHandler.Login)
+			r.Put("/refresh", authorizationHandler.Refresh)
+			r.Put("/logout", authorizationHandler.Logout)
+			r.Post("/register", authorizationHandler.Register)
 		})
 
 	})

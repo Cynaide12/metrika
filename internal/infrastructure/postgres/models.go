@@ -33,6 +33,7 @@ type UserSession struct {
 	UserID       uint   `gorm:"column:user_id;NOT NULL"`
 	RefreshToken string `gorm:"column:refresh_token"`
 	UserAgent    string `gorm:"column:user_agent"`
+	IPAddress string `gorm:"column:ip_address"`
 }
 
 type Domain struct {

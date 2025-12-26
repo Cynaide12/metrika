@@ -3,10 +3,10 @@ package analytics
 import "time"
 
 type GuestSession struct {
-	ID uint
-	GuestID   uint
-	IPAddress string
-	Active    bool
-	EndTime   *time.Time
-	LastActive time.Time
+	ID         uint       `json:"id"`
+	GuestID    uint       `json:"guest_id"`
+	IPAddress  string     `json:"ip_address"`
+	Active     bool       `json:"active"`
+	EndTime    *time.Time `json:"end_time"`
+	LastActive time.Time  `json:"last_active"`
 }
