@@ -3335,7 +3335,8 @@ class Metrika {
 
     if (!data.userId || !data.sessionId) {
       const fp = await this.getFp();
-      const res = await fetch(`${this.baseUrl}/sessions`, {
+      console.log(fp)
+      const res = await fetch(`${this.baseUrl}/analytics/sessions`, {
         method: 'POST',
         body: JSON.stringify({ f_id: fp }),
         headers: {
@@ -3373,7 +3374,7 @@ class Metrika {
   async flush() {
     if (this.queue.length == 0 || !this.sessionId) return;
 
-    await fetch(`${this.baseUrl}/events`, {
+    await fetch(`${this.baseUrl}/analytics/events`, {
       keepalive: true,
       method: 'POST',
       headers: {
@@ -3442,7 +3443,6 @@ const getElementSelector = (element) => {
 
 const setupListeners = async () => {
   const mm = await new Metrika({ baseUrl: 'http://localhost:8081/api/v1' });
-
 
   document.addEventListener('click', (e) => {
     const element = e.target;

@@ -9,9 +9,7 @@ import (
 	response "metrika/pkg/api"
 	"metrika/pkg/logger/sl"
 	"net/http"
-	"strconv"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
 )
@@ -25,8 +23,8 @@ type Handler struct {
 	jwt      *jwt.JWTProvider
 }
 
-func NewHandler(log *slog.Logger, login *auth.LoginUseCase, refresh *auth.RefreshUseCase, register *auth.RegisterUseCase) *Handler {
-	return &Handler{login: login, refresh: refresh, log: log, register: register}
+func NewHandler(log *slog.Logger, login *auth.LoginUseCase, refresh *auth.RefreshUseCase, register *auth.RegisterUseCase, logout *auth.LogoutUseCase, jwt *jwt.JWTProvider) *Handler {
+	return &Handler{login: login, refresh: refresh, log: log, register: register, logout: logout, jwt: jwt}
 }
 
 type LoginRequest struct {
@@ -82,16 +80,21 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.log.Debug("REFRESHTOKEN", slog.String("REFRESH_TOKEN", refresh_token.Value))
+
 	tokens, err := h.refresh.Execute(
 		r.Context(),
 		refresh_token.Value,
 	)
 	if err != nil {
-		if errors.Is(err, domain.ErrInvalidCredentials) {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+		if errors.Is(err, domain.ErrInvalidRefreshToken) {
+			w.WriteHeader(http.StatusUnauthorized)
+			render.JSON(w, r, response.BadRequest("invalid credentials"))
 			return
 		}
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		h.log.Error("ошибка при обновлении рефреш токена", sl.Err(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		render.JSON(w, r, response.Error("internal error"))
 		return
 	}
 
@@ -133,6 +136,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 			render.JSON(w, r, response.Error("user already exists"))
 			return
 		}
+		h.log.Error("ошибка регистарции", sl.Err(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		render.JSON(w, r, response.Error("failed to register"))
 		return
@@ -143,13 +147,16 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
-	session_id, err := strconv.Atoi(chi.URLParam(r, "session_id"))
+	refreshCookie, err := r.Cookie("refresh_token")
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		render.JSON(w, r, response.BadRequest("invalid session id"))
+		render.JSON(w, r, response.BadRequest("invalid credentials"))
 		return
 	}
-	if err := h.logout.Execute(r.Context(), uint(session_id)); err != nil {
+
+	h.log.Debug("REFRESHTOKEN", slog.String("REFRESHTOKEN", refreshCookie.Value))
+
+	if err := h.logout.Execute(r.Context(), refreshCookie.Value); err != nil {
 		if errors.Is(err, domain.ErrSessionNotFound) {
 			w.WriteHeader(http.StatusBadRequest)
 			render.JSON(w, r, response.BadRequest("session not found"))
@@ -159,6 +166,8 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 		render.JSON(w, r, response.Error("failed to logout"))
 		return
 	}
+
+	h.jwt.RemoveCookie(w)
 
 	render.JSON(w, r, response.OK())
 }

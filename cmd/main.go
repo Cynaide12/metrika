@@ -153,17 +153,19 @@ func setupRouter(cfg *config.Config, log *slog.Logger, tracker *tracker.Tracker,
 
 	tokens := jwt.NewJwtProvider(cfg.JWTSecret)
 
+	jwtProvider := jwt.NewJwtProvider(cfg.JWTSecret)
+
 	loginuc := authuc.NewLoginUseCase(repos.users, repos.sessions, tokens)
 	refreshuc := authuc.NewRefreshUseCase(repos.sessions, tokens)
-	registeruc := authuc.NewRegisterUseCase(repos.users, repos.sessions, tokens, log)
+	registeruc := authuc.NewRegisterUseCase(repos.users, repos.sessions, tokens, log, tx)
+	logoutuc := authuc.NewLogoutUseCase(repos.sessions, log, *jwtProvider)
 	guestSessionsByRangeDateuc := metrika.NewSessionsByRangeDateUseCase(repos.guest_sessions)
 	activeSessionsuc := metrika.NewAciveSessionsUseCase(log, repos.guest_sessions)
 
 	analyticsHandler := analhandler.NewHandler(log, evuc, createsesuc)
-	authorizationHandler := authhandler.NewHandler(log, loginuc, refreshuc, registeruc)
+	authorizationHandler := authhandler.NewHandler(log, loginuc, refreshuc, registeruc, logoutuc, jwtProvider)
 	metrikaHandler := methandler.NewHandler(log, guestSessionsByRangeDateuc, activeSessionsuc)
 
-	jwtProvider := jwt.NewJwtProvider(cfg.JWTSecret)
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Group(func(r chi.Router) {
@@ -182,7 +184,7 @@ func setupRouter(cfg *config.Config, log *slog.Logger, tracker *tracker.Tracker,
 		r.Route("/auth", func(r chi.Router) {
 			r.Post("/login", authorizationHandler.Login)
 			r.Put("/refresh", authorizationHandler.Refresh)
-			r.Put("/logout", authorizationHandler.Logout)
+			r.Delete("/logout", authorizationHandler.Logout)
 			r.Post("/register", authorizationHandler.Register)
 		})
 

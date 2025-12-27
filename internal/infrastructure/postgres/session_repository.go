@@ -43,7 +43,7 @@ func (r *SessionRepository) ByID(
 	db := getDB(ctx, r.db)
 
 	var m UserSession
-	if err := db.First(&m, id).Error; err != nil {
+	if err := db.Debug().First(&m, id).Error; err != nil {
 		return nil, domain.ErrSessionNotFound
 	}
 

@@ -40,12 +40,12 @@ func (uc *LoginUseCase) Execute(
 		return nil, domain.ErrInvalidCredentials
 	}
 
-	session := &domain.Session{
+	session := domain.Session{
 		UserID:    user.ID,
 		UserAgent: userAgent,
 	}
 
-	if err := uc.sessions.Create(ctx, session); err != nil {
+	if err := uc.sessions.Create(ctx, &session); err != nil {
 		return nil, err
 	}
 
@@ -53,8 +53,9 @@ func (uc *LoginUseCase) Execute(
 	if err != nil {
 		return nil, err
 	}
+	session.RefreshToken = tokens.Refresh
 
-	if err := uc.sessions.Update(ctx, session); err != nil {
+	if err := uc.sessions.Update(ctx, &session); err != nil {
 		return nil, err
 	}
 
