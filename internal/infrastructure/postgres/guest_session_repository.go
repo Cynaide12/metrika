@@ -73,14 +73,43 @@ func (d *GuestSessionRepository) CreateSessions(ctx context.Context, sessions *[
 func (d *GuestSessionRepository) GetCountActiveSessions(ctx context.Context, domain_id uint) (int64, error) {
 	db := getDB(ctx, d.db)
 
-
-	res := db.Exec("SELECT * FROM guest_sessions s LEFT JOIN guests u ON u.id=s.guest_id WHERE s.active = true AND u.domain_id=?", domain_id);
+	res := db.Exec("SELECT * FROM guest_sessions s LEFT JOIN guests u ON u.id=s.guest_id WHERE s.active = true AND u.domain_id=?", domain_id)
 
 	if res.Error != nil {
 		return 0, res.Error
 	}
 
 	return res.RowsAffected, nil
+}
+
+func (d *GuestSessionRepository) GetVisitsByInterval(
+	ctx context.Context,
+	domain_id uint,
+	opts domain.GetVisitsByIntervalOptions,
+) (*[]domain.GuestSessionsByTimeBucket, error) {
+
+	var buckets []domain.GuestSessionsByTimeBucket
+
+	query := `
+        SELECT 
+            DATE_TRUNC('hour', created_at) + 
+            INTERVAL '? min' * FLOOR(EXTRACT(minute FROM created_at) / ?) as time_bucket,
+            COUNT(*) as visits,
+            COUNT(DISTINCT guest_id) as uniques
+        FROM guest_sessions
+        WHERE created_at BETWEEN ? AND ? 
+        GROUP BY 1
+        ORDER BY time_bucket
+    `
+
+	err := d.db.Raw(query,
+		opts.IntervalMinutes,
+		opts.IntervalDiviser,
+		opts.Start,
+		opts.End,
+	).Scan(&buckets).Error
+
+	return &buckets, err
 }
 
 func (d *GuestSessionRepository) ByRangeDate(ctx context.Context, opts domain.GuestSessionRepositoryByRangeDateOptions) (*[]domain.GuestSession, error) {

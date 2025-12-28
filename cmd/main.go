@@ -161,10 +161,11 @@ func setupRouter(cfg *config.Config, log *slog.Logger, tracker *tracker.Tracker,
 	logoutuc := authuc.NewLogoutUseCase(repos.sessions, log, *jwtProvider)
 	guestSessionsByRangeDateuc := metrika.NewSessionsByRangeDateUseCase(repos.guest_sessions)
 	activeSessionsuc := metrika.NewAciveSessionsUseCase(log, repos.guest_sessions)
+	guestSessionByIntervaluc := metrika.NewSessionsByIntervalUseCase(repos.guest_sessions)
 
 	analyticsHandler := analhandler.NewHandler(log, evuc, createsesuc)
 	authorizationHandler := authhandler.NewHandler(log, loginuc, refreshuc, registeruc, logoutuc, jwtProvider)
-	metrikaHandler := methandler.NewHandler(log, guestSessionsByRangeDateuc, activeSessionsuc)
+	metrikaHandler := methandler.NewHandler(log, guestSessionsByRangeDateuc, activeSessionsuc, guestSessionByIntervaluc)
 
 
 	r.Route("/api/v1", func(r chi.Router) {
@@ -177,6 +178,7 @@ func setupRouter(cfg *config.Config, log *slog.Logger, tracker *tracker.Tracker,
 			r.Route("/metrika", func(r chi.Router) {
 				r.Route("/{domain_id}", func(r chi.Router) {
 					r.Get("/guests/visits", metrikaHandler.GetGuestSessionByRangeDate)
+					r.Get("/guests/byinterval", metrikaHandler.GetGuestSessionsByInterval)
 					r.Get("/guests/online", metrikaHandler.GetCountActiveSessions)
 				})
 			})

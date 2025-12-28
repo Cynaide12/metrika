@@ -10,3 +10,9 @@ type GuestSession struct {
 	EndTime    *time.Time `json:"end_time"`
 	LastActive time.Time  `json:"last_active"`
 }
+
+type GuestSessionsByTimeBucket struct {
+	TimeBucket time.Time `json:"time_bucket"`
+	Visits     int       `json:"visits"`
+	Uniques    int       `json:"uniques"`
+}

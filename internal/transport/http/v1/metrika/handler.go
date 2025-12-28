@@ -19,19 +19,21 @@ type Handler struct {
 	log                    *slog.Logger
 	getSessions            *metrika.SessionsByRangeDateUseCase
 	getCountActiveSessions *metrika.ActiveSessionsUseCase
+	getSessionsByInterval  *metrika.SessionsByIntervalUseCase
 }
 
-func NewHandler(log *slog.Logger, getSessions *metrika.SessionsByRangeDateUseCase, getCountActiveSessions *metrika.ActiveSessionsUseCase) *Handler {
+func NewHandler(log *slog.Logger, getSessions *metrika.SessionsByRangeDateUseCase, getCountActiveSessions *metrika.ActiveSessionsUseCase, getSessionsByInterval *metrika.SessionsByIntervalUseCase) *Handler {
 	return &Handler{
 		log,
 		getSessions,
 		getCountActiveSessions,
+		getSessionsByInterval,
 	}
 }
 
 type GetGuestSessionByRangeDateResponse struct {
-	Sessions *[]domain.GuestSession
-	Response response.Response
+	Sessions *[]domain.GuestSession `json:"sessions"`
+	Response response.Response      `json:"response"`
 }
 
 func (h *Handler) GetGuestSessionByRangeDate(w http.ResponseWriter, r *http.Request) {
@@ -122,8 +124,8 @@ func (h *Handler) GetGuestSessionByRangeDate(w http.ResponseWriter, r *http.Requ
 }
 
 type GetCountActiveSessionsResponse struct {
-	Online int64 `json:"online"`
-	Response response.Response
+	Online   int64             `json:"online"`
+	Response response.Response `json:"response"`
 }
 
 func (h *Handler) GetCountActiveSessions(w http.ResponseWriter, r *http.Request) {
@@ -144,7 +146,72 @@ func (h *Handler) GetCountActiveSessions(w http.ResponseWriter, r *http.Request)
 	}
 
 	render.JSON(w, r, GetCountActiveSessionsResponse{
-		Online: count,
+		Online:   count,
 		Response: response.OK(),
 	})
+}
+
+type GuestSessionsByIntervalResponse struct {
+	Response response.Response
+	Sessions *[]domain.GuestSessionsByTimeBucket `json:"sessions"`
+}
+
+func (h *Handler) GetGuestSessionsByInterval(w http.ResponseWriter, r *http.Request) {
+
+	domain_id, err := strconv.Atoi(chi.URLParam(r, "domain_id"))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		render.JSON(w, r, response.BadRequest("bad domain id"))
+		return
+	}
+
+	var opts domain.GetVisitsByIntervalOptions
+
+	start_date, err := time.Parse(time.RFC3339, r.URL.Query().Get("start"))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		render.JSON(w, r, response.BadRequest("bad start date"))
+		return
+	}
+	opts.Start = start_date
+
+	end_date, err := time.Parse(time.RFC3339, r.URL.Query().Get("end"))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		render.JSON(w, r, response.BadRequest("bad end date"))
+		return
+	}
+	opts.End = end_date
+
+	interval, err := strconv.Atoi(r.URL.Query().Get("interval"))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		render.JSON(w, r, response.BadRequest("bad interval"))
+		return
+	}
+
+	opts.IntervalMinutes = interval
+
+	diviser, err := strconv.Atoi(r.URL.Query().Get("diviser"))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		render.JSON(w, r, response.BadRequest("bad diviser"))
+		return
+	}
+
+	opts.IntervalDiviser = diviser
+
+	sessions, err := h.getSessionsByInterval.Execute(r.Context(), uint(domain_id), opts)
+	if err != nil {
+		h.log.Error("ошибка при получении сессий по интервалам за период", sl.Err(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		render.JSON(w, r, response.Error("failed to get o"))
+		return
+	}
+
+	render.JSON(w, r, GuestSessionsByIntervalResponse{
+		Response: response.OK(),
+		Sessions: sessions,
+	})
+
 }
