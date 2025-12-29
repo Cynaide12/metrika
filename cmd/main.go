@@ -134,7 +134,7 @@ func setupRouter(cfg *config.Config, log *slog.Logger, tracker *tracker.Tracker,
 	}
 
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{"http://*, https://", "http://localhost:3000"},
+		AllowedOrigins: []string{"http://*, https://", "http://localhost:3000", "http://localhost:3001"},
 		AllowedMethods: []string{
 			http.MethodHead,
 			http.MethodGet,
@@ -167,14 +167,9 @@ func setupRouter(cfg *config.Config, log *slog.Logger, tracker *tracker.Tracker,
 	authorizationHandler := authhandler.NewHandler(log, loginuc, refreshuc, registeruc, logoutuc, jwtProvider)
 	metrikaHandler := methandler.NewHandler(log, guestSessionsByRangeDateuc, activeSessionsuc, guestSessionByIntervaluc)
 
-
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Group(func(r chi.Router) {
 			r.Use(mid.AuthMiddleware(log, cfg.JWTSecret, *cfg, *jwtProvider))
-			r.Route("/analytics", func(r chi.Router) {
-				r.Post("/events", analyticsHandler.AddEvent)
-				r.Post("/sessions", analyticsHandler.CreateGuestSession)
-			})
 			r.Route("/metrika", func(r chi.Router) {
 				r.Route("/{domain_id}", func(r chi.Router) {
 					r.Get("/guests/visits", metrikaHandler.GetGuestSessionByRangeDate)
@@ -188,6 +183,11 @@ func setupRouter(cfg *config.Config, log *slog.Logger, tracker *tracker.Tracker,
 			r.Put("/refresh", authorizationHandler.Refresh)
 			r.Delete("/logout", authorizationHandler.Logout)
 			r.Post("/register", authorizationHandler.Register)
+		})
+
+		r.Route("/analytics", func(r chi.Router) {
+			r.Post("/events", analyticsHandler.AddEvent)
+			r.Post("/sessions", analyticsHandler.CreateGuestSession)
 		})
 
 	})

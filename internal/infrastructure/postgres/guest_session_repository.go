@@ -91,23 +91,39 @@ func (d *GuestSessionRepository) GetVisitsByInterval(
 	var buckets []domain.GuestSessionsByTimeBucket
 
 	query := `
-        SELECT 
-            DATE_TRUNC('hour', created_at) + 
-            INTERVAL '? min' * FLOOR(EXTRACT(minute FROM created_at) / ?) as time_bucket,
-            COUNT(*) as visits,
-            COUNT(DISTINCT guest_id) as uniques
-        FROM guest_sessions
-        WHERE created_at BETWEEN ? AND ? 
-        GROUP BY 1
-        ORDER BY time_bucket
-    `
-
-	err := d.db.Raw(query,
-		opts.IntervalMinutes,
-		opts.IntervalDiviser,
-		opts.Start,
-		opts.End,
-	).Scan(&buckets).Error
+	WITH params AS (
+	  SELECT ?::int AS interval_minutes, ?::int AS interval_diviser, ?::timestamptz AS start_ts, ?::timestamptz AS end_ts
+	),
+	bounds AS (
+	  SELECT
+	    (date_trunc('hour', start_ts)
+	      + ((floor(extract(minute FROM start_ts)/params.interval_diviser::numeric)::int * params.interval_minutes::int) || ' minutes')::interval) AS start_bucket,
+	    (date_trunc('hour', end_ts)
+	      + ((floor(extract(minute FROM end_ts)/params.interval_diviser::numeric)::int * params.interval_minutes::int) || ' minutes')::interval) AS end_bucket
+	  FROM params
+	),
+	agg AS (
+	  SELECT
+	    (date_trunc('hour', created_at)
+	      + ((floor(extract(minute FROM created_at)/params.interval_diviser::numeric)::int * params.interval_minutes::int) || ' minutes')::interval) AS time_bucket,
+	    COUNT(*) AS visits,
+	    COUNT(DISTINCT guest_id) AS uniques
+	  FROM guest_sessions, params
+	  WHERE created_at BETWEEN params.start_ts AND params.end_ts
+	  GROUP BY 1
+	)
+	SELECT gs.time_bucket,
+	       COALESCE(a.visits, 0) AS visits,
+	       COALESCE(a.uniques, 0) AS uniques
+	FROM bounds, params,
+	     generate_series(bounds.start_bucket, bounds.end_bucket, (params.interval_minutes::int || ' minutes')::interval) AS gs(time_bucket)
+	LEFT JOIN agg a USING (time_bucket)
+	ORDER BY time_bucket;
+	`
+	err := d.db.Debug().
+		Raw(query, opts.IntervalMinutes, opts.IntervalDiviser, opts.Start, opts.End).
+		Scan(&buckets).
+		Error
 
 	return &buckets, err
 }

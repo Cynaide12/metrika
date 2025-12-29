@@ -152,7 +152,7 @@ func (h *Handler) GetCountActiveSessions(w http.ResponseWriter, r *http.Request)
 }
 
 type GuestSessionsByIntervalResponse struct {
-	Response response.Response
+	Response response.Response                   `json:"response"`
 	Sessions *[]domain.GuestSessionsByTimeBucket `json:"sessions"`
 }
 
@@ -167,7 +167,7 @@ func (h *Handler) GetGuestSessionsByInterval(w http.ResponseWriter, r *http.Requ
 
 	var opts domain.GetVisitsByIntervalOptions
 
-	start_date, err := time.Parse(time.RFC3339, r.URL.Query().Get("start"))
+	start_date, err := time.Parse(time.RFC3339Nano, r.URL.Query().Get("start"))
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		render.JSON(w, r, response.BadRequest("bad start date"))
@@ -175,7 +175,7 @@ func (h *Handler) GetGuestSessionsByInterval(w http.ResponseWriter, r *http.Requ
 	}
 	opts.Start = start_date
 
-	end_date, err := time.Parse(time.RFC3339, r.URL.Query().Get("end"))
+	end_date, err := time.Parse(time.RFC3339Nano, r.URL.Query().Get("end"))
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		render.JSON(w, r, response.BadRequest("bad end date"))
