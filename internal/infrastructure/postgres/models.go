@@ -12,12 +12,20 @@ type Model struct {
 
 type Event struct {
 	Model
-	SessionID uint      `gorm:"column:session_id;NOT NULL"`
-	Type      string    `gorm:"column:type;NOT NULL"`
-	PageURL   string    `gorm:"column:page_url;NOT NULL"`
-	Element   string    `gorm:"column:element;NOT NULL"`
-	Timestamp time.Time `gorm:"column:timestamp;NOT NULL"`
-	// Data      map[string]interface{} `gorm:"column:data;NOT NULL"`
+	SessionID uint                   `gorm:"column:session_id;NOT NULL"`
+	Type      string                 `gorm:"column:type;NOT NULL"`
+	PageURL   string                 `gorm:"column:page_url;NOT NULL"`
+	Element   string                 `gorm:"column:element;NOT NULL"`
+	Timestamp time.Time              `gorm:"column:timestamp;NOT NULL"`
+	Data      map[string]interface{} `gorm:"serializer:json;column:data"`
+}
+
+type RecordEvent struct {
+	Model
+	SessionID uint                   `gorm:"column:session_id;NOT NULL"`
+	Type      string                 `gorm:"column:type;NOT NULL"`
+	Timestamp time.Time              `gorm:"column:timestamp;NOT NULL"`
+	Data      map[string]interface{} `gorm:"serializer:json;column:data"`
 }
 
 type User struct {
@@ -33,7 +41,7 @@ type UserSession struct {
 	UserID       uint   `gorm:"column:user_id;NOT NULL"`
 	RefreshToken string `gorm:"column:refresh_token"`
 	UserAgent    string `gorm:"column:user_agent"`
-	IPAddress string `gorm:"column:ip_address"`
+	IPAddress    string `gorm:"column:ip_address"`
 }
 
 type Domain struct {

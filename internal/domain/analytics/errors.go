@@ -10,4 +10,6 @@ var (
 	ErrStaleSessionsNotFound = errors.New("stale sessions not found")
 	ErrLastActiveSessionNotFound = errors.New("last active session not found")
 	ErrSessionsNotFound = errors.New("sessions not found")
+	ErrSessionInvalid = errors.New("session invalid")
+	ErrRecordEventsNotFound = errors.New("record events not found")
 )

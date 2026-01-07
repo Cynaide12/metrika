@@ -26,7 +26,7 @@ func New(cfg *config.Config) (*gorm.DB, error) {
 	}
 
 	//миграции
-	GormDB.AutoMigrate(&Event{}, &User{}, &Guest{}, &GuestSession{}, &UserSession{}, &Domain{})
+	GormDB.AutoMigrate(&Event{}, &User{}, &Guest{}, &GuestSession{}, &UserSession{}, &Domain{}, &RecordEvent{})
 
 	return GormDB, err
 }

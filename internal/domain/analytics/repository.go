@@ -24,8 +24,8 @@ type GuestSessionRepositoryByRangeDateOptions struct {
 }
 
 type GetVisitsByIntervalOptions struct {
-	Start time.Time
-	End time.Time
+	Start           time.Time
+	End             time.Time
 	IntervalMinutes int
 	IntervalDiviser int
 }
@@ -51,4 +51,9 @@ type DomainRepository interface {
 	AddDomain(ctx context.Context, site_url string) (*Domain, error)
 	GetDomainGuests(ctx context.Context, domainId uint) (*[]Guest, error)
 	GetCountDomainGuests(ctx context.Context, domain_id uint) (int64, error)
+}
+
+type RecordEventRepository interface {
+	SaveEvents(ctx context.Context, events *[]RecordEvent) error
+	GetBySessionId(ctx context.Context, session_id uint) (*[]RecordEvent, error)
 }

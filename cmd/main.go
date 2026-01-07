@@ -134,7 +134,7 @@ func setupRouter(cfg *config.Config, log *slog.Logger, tracker *tracker.Tracker,
 	}
 
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{"http://*, https://", "http://localhost:3000", "http://localhost:3001"},
+		AllowedOrigins: []string{"http://*, https://", "http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:5500"},
 		AllowedMethods: []string{
 			http.MethodHead,
 			http.MethodGet,
