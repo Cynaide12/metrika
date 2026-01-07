@@ -33,6 +33,7 @@ import (
 type repos struct {
 	domains        analytics.DomainRepository
 	events         analytics.EventsRepository
+	record_events  analytics.RecordEventRepository
 	guests         analytics.GuestsRepository
 	guest_sessions analytics.GuestSessionRepository
 	sessions       auth.SessionRepository
@@ -62,6 +63,7 @@ func main() {
 	}
 
 	events := postgres.NewEventsRepository(db)
+	record_events := postgres.NewRecordEventRepository(db)
 	guest_sessions := postgres.NewGuestSessionRepository(db)
 	domains := postgres.NewDomainRepository(db)
 	sessions := postgres.NewSessionRepository(db)
@@ -76,6 +78,7 @@ func main() {
 		guests:         guests,
 		guest_sessions: guest_sessions,
 		users:          users,
+		record_events:  record_events,
 	}
 
 	tracker := tracker.New(1000, time.Second*15, 10000, events)
@@ -149,7 +152,8 @@ func setupRouter(cfg *config.Config, log *slog.Logger, tracker *tracker.Tracker,
 	}))
 
 	evuc := analuc.NewCollectEventsUseCase(repos.events, tracker, repos.guest_sessions, tx)
-	createsesuc := analuc.NewGetGuestSessionUseCase(repos.guests, repos.guest_sessions, repos.domains, log)
+	recordevuc := analuc.NewCollectRecordEventsUseCase(repos.record_events)
+	getguestse := analuc.NewGetGuestSessionUseCase(repos.guests, repos.guest_sessions, repos.domains, log)
 
 	tokens := jwt.NewJwtProvider(cfg.JWTSecret)
 
@@ -163,7 +167,7 @@ func setupRouter(cfg *config.Config, log *slog.Logger, tracker *tracker.Tracker,
 	activeSessionsuc := metrika.NewAciveSessionsUseCase(log, repos.guest_sessions)
 	guestSessionByIntervaluc := metrika.NewSessionsByIntervalUseCase(repos.guest_sessions)
 
-	analyticsHandler := analhandler.NewHandler(log, evuc, createsesuc)
+	analyticsHandler := analhandler.NewHandler(log, evuc, getguestse, recordevuc)
 	authorizationHandler := authhandler.NewHandler(log, loginuc, refreshuc, registeruc, logoutuc, jwtProvider)
 	metrikaHandler := methandler.NewHandler(log, guestSessionsByRangeDateuc, activeSessionsuc, guestSessionByIntervaluc)
 

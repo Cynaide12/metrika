@@ -18086,8 +18086,6 @@ class Metrika {
       // Критически важные опции для SPA:
       recordAfter: "DOMContentLoaded",
       checkoutEveryNth: 100,
-      // Игнорируем частые события
-      maskTextSelector: "*",
       maskAllInputs: true,
     });
   }
@@ -18262,5 +18260,9 @@ const setupListeners = async () => {
 };
 
 document.addEventListener("DOMContentLoaded", () => {
-  setupListeners();
+  setupListeners()
 });
+
+// (() => {
+//   setupListeners();
+// })({});

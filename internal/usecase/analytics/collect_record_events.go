@@ -3,16 +3,14 @@ package analytics
 import (
 	"context"
 	domain "metrika/internal/domain/analytics"
-	"metrika/internal/infrastructure/jwt"
 )
 
 type CollectRecordEventsUseCase struct {
 	events domain.RecordEventRepository
-	jwt    *jwt.JWTProvider
 }
 
-func NewCollectRecordEventsUseCase(events domain.RecordEventRepository, jwt *jwt.JWTProvider) *CollectRecordEventsUseCase {
-	return &CollectRecordEventsUseCase{events, jwt}
+func NewCollectRecordEventsUseCase(events domain.RecordEventRepository) *CollectRecordEventsUseCase {
+	return &CollectRecordEventsUseCase{events}
 }
 
 func (uc *CollectRecordEventsUseCase) Execute(ctx context.Context, events *[]domain.RecordEvent, session_id uint) error {
