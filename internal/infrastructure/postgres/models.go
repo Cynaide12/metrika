@@ -23,8 +23,8 @@ type Event struct {
 type RecordEvent struct {
 	Model
 	SessionID uint                   `gorm:"column:session_id;NOT NULL"`
-	Type      string                 `gorm:"column:type;NOT NULL"`
-	Timestamp time.Time              `gorm:"column:timestamp;NOT NULL"`
+	Type      int                 `gorm:"column:type;NOT NULL"`
+	Timestamp int64              `gorm:"column:timestamp;NOT NULL"`
 	Data      map[string]interface{} `gorm:"serializer:json;column:data"`
 }
 

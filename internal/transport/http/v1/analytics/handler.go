@@ -84,11 +84,10 @@ func (h *Handler) AddEvent(w http.ResponseWriter, r *http.Request) {
 }
 
 type AddRecordEventsRequest struct {
-	Events *[]domain.RecordEvent `json:"events" validate:"required"`
+	Events []domain.RecordEvent `json:"events" validate:"required"`
 }
 
-
-//TODO: вынести в обработку сохранений по пачкам в воркер
+// TODO: вынести в обработку сохранений по пачкам в воркер
 func (h *Handler) AddRecordEvents(w http.ResponseWriter, r *http.Request) {
 
 	session_id, err := strconv.Atoi(chi.URLParam(r, "session_id"))
@@ -100,7 +99,9 @@ func (h *Handler) AddRecordEvents(w http.ResponseWriter, r *http.Request) {
 
 	var req AddRecordEventsRequest
 	if err := render.Decode(r, &req); err != nil {
-		http.Error(w, "unable to decode request", http.StatusBadRequest)
+		h.log.Debug("UNABLE TO DECODE REQUEST", sl.Err(err))
+		w.WriteHeader(http.StatusBadRequest)
+		render.JSON(w, r, response.BadRequest("unable to decode request"))
 		return
 	}
 
@@ -123,7 +124,7 @@ func (h *Handler) AddRecordEvents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	render.JSON(w,r, response.OK())
+	render.JSON(w, r, response.OK())
 }
 
 type CreateNewSessionRequest struct {

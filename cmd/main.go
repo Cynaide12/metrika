@@ -191,6 +191,7 @@ func setupRouter(cfg *config.Config, log *slog.Logger, tracker *tracker.Tracker,
 
 		r.Route("/analytics", func(r chi.Router) {
 			r.Post("/events", analyticsHandler.AddEvent)
+			r.Post("/{session_id}/record", analyticsHandler.AddRecordEvents)
 			r.Post("/sessions", analyticsHandler.CreateGuestSession)
 		})
 
