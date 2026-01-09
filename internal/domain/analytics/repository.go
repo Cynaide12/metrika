@@ -9,6 +9,14 @@ type EventsRepository interface {
 	SaveEvents(ctx context.Context, events *[]Event) error
 }
 
+type FindGuestsOptions struct {
+	DomainID  uint
+	StartDate *time.Time
+	EndDate   *time.Time
+	Limit     *int
+	Offset    *int
+}
+
 type GuestsRepository interface {
 	FirstOrCreate(ctx context.Context, fingerprint string, domain_id uint) (*Guest, error)
 	CreateGuests(ctx context.Context, guests *[]Guest) ([]Guest, error)

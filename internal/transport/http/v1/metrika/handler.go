@@ -47,7 +47,7 @@ func (h *Handler) GetGuestSessionByRangeDate(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	st := r.URL.Query().Get("start_date")
+	st := r.URL.Query().Get("start")
 	if st != "" {
 		start_date, err := strconv.Atoi(st)
 		if err != nil {
@@ -58,7 +58,7 @@ func (h *Handler) GetGuestSessionByRangeDate(w http.ResponseWriter, r *http.Requ
 		opts.StartDate = pointers.NewTimePointer(time.Unix(int64(start_date), 0))
 	}
 
-	ed := r.URL.Query().Get("end_date")
+	ed := r.URL.Query().Get("end")
 
 	if ed != "" {
 		end_date, err := strconv.Atoi(r.URL.Query().Get("end_date"))

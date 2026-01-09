@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	domain "metrika/internal/domain/analytics"
 
 	"gorm.io/gorm"
@@ -67,4 +68,48 @@ func (r *GuestsRepository) CreateGuests(ctx context.Context, guests *[]domain.Gu
 	}
 
 	return dGuests, nil
+}
+
+
+//TODO:доделать, тут надо искать start date и end date у сессий, а domain_id - у посетителя
+func(r *GuestsRepository) Find(ctx context.Context, opts domain.FindGuestsOptions) (*[]domain.Guest, error){
+	db := getDB(ctx, r.db)
+
+	var mGuests *[]Guest
+
+	query := db.Model(&Guest{}).Joins("LEFT JOIN guest_sessions gs ON guests.id=gs.guest_id").Where("guests.domain_id = ?", opts.DomainID)
+
+	if opts.StartDate != nil{
+		query.Where("NOT gs.created_at < ?", opts.StartDate)
+	}
+	if opts.EndDate != nil{
+		query.Where("NOT gs.created_at > ?", opts.EndDate)
+	}
+	if opts.Limit != nil{
+		query.Limit(*opts.Limit)
+	}
+	if opts.Offset != nil{
+		query.Offset(*opts.Offset)
+	}
+
+	if err := query.Find(&mGuests).Error; err != nil{
+		if errors.Is(err, gorm.ErrRecordNotFound){
+			return nil, domain.ErrGuestsNotFound
+		}
+		return nil, err
+	}
+
+	var guests []domain.Guest
+
+	for _, guest := range *mGuests{
+		//todo:запрос говно. надо переделать. 
+		//todo:посмотреть как вообще парсятся данные с результата sql запросов, про подзапросы, как можно форматировать вид результатов запроса
+		//todo: например чтобы в результате запроса само выводилось firstVisit и LastVisit, а не пришлось бы его высчитывать в коде
+		guests = append(guests, domain.Guest{
+			ID: guest.ID,
+			DomainID: guest.DomainID,
+			// FirstVisit: ,
+		})
+	}
+
 }

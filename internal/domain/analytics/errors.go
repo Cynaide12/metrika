@@ -12,4 +12,5 @@ var (
 	ErrSessionsNotFound = errors.New("sessions not found")
 	ErrSessionInvalid = errors.New("session invalid")
 	ErrRecordEventsNotFound = errors.New("record events not found")
+	ErrGuestsNotFound = errors.New("guests not found")
 )

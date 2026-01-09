@@ -23,7 +23,7 @@ func (ec *SessionsByRangeDateUseCase) Execute(
 ) (*[]domain.GuestSession, error) {
 
 	//не больше 1000 сессий за раз можно извлекать
-	if opts.Limit == nil {
+	if opts.Limit == nil || *opts.Limit > 1000 {
 		opts.Limit = pointers.NewIntPointer(1000)
 	}
 
