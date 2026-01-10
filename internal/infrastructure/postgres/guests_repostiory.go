@@ -59,10 +59,10 @@ func (r *GuestsRepository) CreateGuests(ctx context.Context, guests *[]domain.Gu
 	}
 
 	var dGuests []domain.Guest
-	for _, guest := range mGuests{
+	for _, guest := range mGuests {
 		dGuests = append(dGuests, domain.Guest{
-			ID: guest.ID,
-			DomainID: guest.DomainID,
+			ID:          guest.ID,
+			DomainID:    guest.DomainID,
 			Fingerprint: guest.Fingerprint,
 		})
 	}
@@ -70,43 +70,56 @@ func (r *GuestsRepository) CreateGuests(ctx context.Context, guests *[]domain.Gu
 	return dGuests, nil
 }
 
-
-//TODO:доделать, тут надо искать start date и end date у сессий, а domain_id - у посетителя
-func(r *GuestsRepository) Find(ctx context.Context, opts domain.FindGuestsOptions) (*[]domain.Guest, error){
+// TODO:доделать
+func (r *GuestsRepository) Find(ctx context.Context, opts domain.FindGuestsOptions) (*[]domain.Guest, error) {
 	db := getDB(ctx, r.db)
 
 	var mGuests *[]Guest
 
-	query := db.Model(&Guest{}).Joins("LEFT JOIN guest_sessions gs ON guests.id=gs.guest_id").Where("guests.domain_id = ?", opts.DomainID)
+	query := db.Table("guests g").
+		Select(`
+	g.id,
+	g.domain_id, 
+	g.f_id,
+	MIN(gs.created_at) AS first_visit,
+	MAX(gs.created_at) AS last_visit,
+	COUNT(gs.id) AS sessions_count,
+	EXISTS(SELECT 1 FROM guest_sessions as
+	WHERE as.guest_id=g.id AND as.active=true AND as.end_time IS NULL) as online
+	`).Joins(`
+	LEFT JOIN guest_sessions gs ON g.id=gs.guest_id
+	`).Where("g.domain_id=?", opts.DomainID)
 
-	if opts.StartDate != nil{
-		query.Where("NOT gs.created_at < ?", opts.StartDate)
-	}
-	if opts.EndDate != nil{
-		query.Where("NOT gs.created_at > ?", opts.EndDate)
-	}
-	if opts.Limit != nil{
-		query.Limit(*opts.Limit)
-	}
-	if opts.Offset != nil{
-		query.Offset(*opts.Offset)
+	if opts.StartDate != nil && opts.EndDate != nil {
+		query = query.Where("EXISTS (SELECT 1 FROM guest_sessions gs2 WHERE gs2.created_at >= ? AND gs2.created_at <= ?)", opts.StartDate, opts.EndDate)
+	} else if opts.StartDate != nil {
+		query = query.Where("EXISTS (SELECT 1 FROM guest_sessions gs2 WHERE gs2.created_at >= ?)", opts.StartDate)
+	} else if opts.EndDate != nil {
+		query = query.Where("EXISTS (SELECT 1 FROM guest_sessions gs2 WHERE gs2.created_at <= ?)", opts.EndDate)
 	}
 
-	if err := query.Find(&mGuests).Error; err != nil{
-		if errors.Is(err, gorm.ErrRecordNotFound){
+	query = query.Group("g.id, g.domain_id, g.f_id")
+
+	if opts.Limit != nil {
+		query = query.Limit(*opts.Limit)
+	}
+	if opts.Offset != nil {
+		query = query.Offset(*opts.Offset)
+	}
+
+	if err := query.Find(&mGuests).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, domain.ErrGuestsNotFound
 		}
 		return nil, err
 	}
 
+	//todo:ДОДЕЛАТЬ парсинг результатов в структуру и НЕ ЗАБЫТЬ ПРО ORDER - ПО LAST_ACTIVE???
 	var guests []domain.Guest
 
-	for _, guest := range *mGuests{
-		//todo:запрос говно. надо переделать. 
-		//todo:посмотреть как вообще парсятся данные с результата sql запросов, про подзапросы, как можно форматировать вид результатов запроса
-		//todo: например чтобы в результате запроса само выводилось firstVisit и LastVisit, а не пришлось бы его высчитывать в коде
+	for _, guest := range *mGuests {
 		guests = append(guests, domain.Guest{
-			ID: guest.ID,
+			ID:       guest.ID,
 			DomainID: guest.DomainID,
 			// FirstVisit: ,
 		})
