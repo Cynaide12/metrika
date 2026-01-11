@@ -3,6 +3,7 @@ package metrika
 import (
 	"log/slog"
 	domain "metrika/internal/domain/analytics"
+	"metrika/internal/usecase/analytics"
 	"metrika/internal/usecase/metrika"
 	response "metrika/pkg/api"
 	"metrika/pkg/logger/sl"
@@ -20,14 +21,22 @@ type Handler struct {
 	getSessions            *metrika.SessionsByRangeDateUseCase
 	getCountActiveSessions *metrika.ActiveSessionsUseCase
 	getSessionsByInterval  *metrika.SessionsByIntervalUseCase
+	getGuests              *analytics.GetGuestsUseCase
 }
 
-func NewHandler(log *slog.Logger, getSessions *metrika.SessionsByRangeDateUseCase, getCountActiveSessions *metrika.ActiveSessionsUseCase, getSessionsByInterval *metrika.SessionsByIntervalUseCase) *Handler {
+func NewHandler(
+	log *slog.Logger,
+	getSessions *metrika.SessionsByRangeDateUseCase,
+	getCountActiveSessions *metrika.ActiveSessionsUseCase,
+	getSessionsByInterval *metrika.SessionsByIntervalUseCase,
+	getGuests *analytics.GetGuestsUseCase,
+) *Handler {
 	return &Handler{
 		log,
 		getSessions,
 		getCountActiveSessions,
 		getSessionsByInterval,
+		getGuests,
 	}
 }
 
@@ -212,6 +221,82 @@ func (h *Handler) GetGuestSessionsByInterval(w http.ResponseWriter, r *http.Requ
 	render.JSON(w, r, GuestSessionsByIntervalResponse{
 		Response: response.OK(),
 		Sessions: sessions,
+	})
+
+}
+
+type GetGuestsResponse struct {
+	Response response.Response `json:"response"`
+	Guests   []domain.Guest    `json:"guests"`
+}
+
+func (h *Handler) GetGuests(w http.ResponseWriter, r *http.Request) {
+
+	domain_id, err := strconv.Atoi(chi.URLParam(r, "domain_id"))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		render.JSON(w, r, response.BadRequest("bad domain id"))
+		return
+	}
+
+	var opts domain.FindGuestsOptions
+	opts.DomainID = uint(domain_id)
+
+	st := r.URL.Query().Get("start_date")
+	if st != "" {
+		start_date, err := time.Parse(time.RFC3339Nano, st)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			render.JSON(w, r, response.BadRequest("bad start date"))
+			return
+		}
+		opts.StartDate = &start_date
+	}
+
+	end := r.URL.Query().Get("end_date")
+	if end != "" {
+		end_date, err := time.Parse(time.RFC3339Nano, r.URL.Query().Get("end"))
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			render.JSON(w, r, response.BadRequest("bad end date"))
+			return
+		}
+		opts.EndDate = &end_date
+	}
+
+	lt := r.URL.Query().Get("limit")
+	if lt != "" {
+		limit, err := strconv.Atoi(lt)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			render.JSON(w, r, response.BadRequest("bad limit"))
+			return
+		}
+		opts.Limit = &limit
+	}
+
+	ot := r.URL.Query().Get("offset")
+	if ot != "" {
+		offset, err := strconv.Atoi(ot)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			render.JSON(w, r, response.BadRequest("bad offset"))
+			return
+		}
+		opts.Offset = &offset
+	}
+
+	guests, err := h.getGuests.Execute(r.Context(), opts)
+	if err != nil {
+		h.log.Error("ошибка при получении гостей с базы")
+		w.WriteHeader(http.StatusInternalServerError)
+		render.JSON(w, r, response.Error("failed to get guests"))
+		return
+	}
+
+	render.JSON(w, r, GetGuestsResponse{
+		Response: response.OK(),
+		Guests:   *guests,
 	})
 
 }

@@ -70,11 +70,11 @@ func (r *GuestsRepository) CreateGuests(ctx context.Context, guests *[]domain.Gu
 	return dGuests, nil
 }
 
-// TODO:доделать
-func (r *GuestsRepository) Find(ctx context.Context, opts domain.FindGuestsOptions) (*[]domain.Guest, error) {
+//TODO:сделать подсчет общего кол-ва времени на сайте для юзера
+func (r *GuestsRepository) Find(ctx context.Context, opts domain.FindGuestsOptions) ([]domain.Guest, error) {
 	db := getDB(ctx, r.db)
 
-	var mGuests *[]Guest
+	var mGuests *[]GuestDTO
 
 	query := db.Table("guests g").
 		Select(`
@@ -84,8 +84,10 @@ func (r *GuestsRepository) Find(ctx context.Context, opts domain.FindGuestsOptio
 	MIN(gs.created_at) AS first_visit,
 	MAX(gs.created_at) AS last_visit,
 	COUNT(gs.id) AS sessions_count,
-	EXISTS(SELECT 1 FROM guest_sessions as
-	WHERE as.guest_id=g.id AND as.active=true AND as.end_time IS NULL) as online
+	EXISTS(
+	SELECT 1 FROM guest_sessions ss
+	WHERE ss.guest_id=g.id AND ss.active=true AND ss.end_time IS NULL
+	) as is_online
 	`).Joins(`
 	LEFT JOIN guest_sessions gs ON g.id=gs.guest_id
 	`).Where("g.domain_id=?", opts.DomainID)
@@ -107,22 +109,18 @@ func (r *GuestsRepository) Find(ctx context.Context, opts domain.FindGuestsOptio
 		query = query.Offset(*opts.Offset)
 	}
 
-	if err := query.Find(&mGuests).Error; err != nil {
+	if err := query.Order("last_visit ASC").Find(&mGuests).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, domain.ErrGuestsNotFound
 		}
 		return nil, err
 	}
 
-	//todo:ДОДЕЛАТЬ парсинг результатов в структуру и НЕ ЗАБЫТЬ ПРО ORDER - ПО LAST_ACTIVE???
 	var guests []domain.Guest
 
 	for _, guest := range *mGuests {
-		guests = append(guests, domain.Guest{
-			ID:       guest.ID,
-			DomainID: guest.DomainID,
-			// FirstVisit: ,
-		})
+		guests = append(guests, guest.ToDomain())
 	}
 
+	return guests, nil
 }
