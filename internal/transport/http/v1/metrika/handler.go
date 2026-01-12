@@ -228,6 +228,7 @@ func (h *Handler) GetGuestSessionsByInterval(w http.ResponseWriter, r *http.Requ
 type GetGuestsResponse struct {
 	Response response.Response `json:"response"`
 	Guests   []domain.Guest    `json:"guests"`
+	Total    int64             `json:"total"`
 }
 
 func (h *Handler) GetGuests(w http.ResponseWriter, r *http.Request) {
@@ -255,7 +256,7 @@ func (h *Handler) GetGuests(w http.ResponseWriter, r *http.Request) {
 
 	end := r.URL.Query().Get("end_date")
 	if end != "" {
-		end_date, err := time.Parse(time.RFC3339Nano, r.URL.Query().Get("end"))
+		end_date, err := time.Parse(time.RFC3339Nano, end)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			render.JSON(w, r, response.BadRequest("bad end date"))
@@ -286,7 +287,7 @@ func (h *Handler) GetGuests(w http.ResponseWriter, r *http.Request) {
 		opts.Offset = &offset
 	}
 
-	guests, err := h.getGuests.Execute(r.Context(), opts)
+	guests, total,  err := h.getGuests.Execute(r.Context(), opts)
 	if err != nil {
 		h.log.Error("ошибка при получении гостей с базы")
 		w.WriteHeader(http.StatusInternalServerError)
@@ -297,6 +298,7 @@ func (h *Handler) GetGuests(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, r, GetGuestsResponse{
 		Response: response.OK(),
 		Guests:   *guests,
+		Total: total,
 	})
 
 }

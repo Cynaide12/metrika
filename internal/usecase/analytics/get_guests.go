@@ -17,17 +17,17 @@ func NewGetGuestsUseCase(guests domain.GuestsRepository, log *slog.Logger) *GetG
 	return &GetGuestsUseCase{guests, log}
 }
 
-func (uc *GetGuestsUseCase) Execute(ctx context.Context, opts domain.FindGuestsOptions) (*[]domain.Guest, error) {
+func (uc *GetGuestsUseCase) Execute(ctx context.Context, opts domain.FindGuestsOptions) (*[]domain.Guest, int64, error) {
 
 	//max 100
 	if opts.Limit == nil {
 		opts.Limit = pointers.NewIntPointer(100)
 	}
 
-	guests, err := uc.guests.Find(ctx, opts)
+	guests, total, err := uc.guests.Find(ctx, opts)
 	if err != nil && !errors.Is(err, domain.ErrGuestsNotFound) {
-		return nil, err
+		return nil, 0, err
 	}
 
-	return &guests, err
+	return &guests, total, err
 }

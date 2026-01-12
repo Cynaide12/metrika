@@ -108,7 +108,7 @@ func (m MockService) seedMockData() (mockDomainId uint, mockGuestsIds []uint, mo
 func (m MockService) initMockGuests(ctx context.Context, mockDomainId uint) ([]uint, error) {
 	var mockGuestsIds []uint
 
-	IsFilledGuests, guestsToGenerate, err := m.checkLimitDomainGuests(ctx, mockDomainId)
+	IsFilledGuests, _, err := m.checkLimitDomainGuests(ctx, mockDomainId)
 	if err != nil {
 		return mockGuestsIds, err
 	}
@@ -116,12 +116,11 @@ func (m MockService) initMockGuests(ctx context.Context, mockDomainId uint) ([]u
 	//если юзеры уже добавлены до максимума - не добавляем
 	if !IsFilledGuests {
 		var mockGuestsToAdd []domain.Guest
-		for range guestsToGenerate {
+		for range 100 {
 			//генерируем юзера
 			mockGuestsToAdd = append(mockGuestsToAdd, m.generator.GenerateMockGuest(mockDomainId))
 		}
 
-		//TODO: НЕ ЗАБЫТЬ ЧТО В МАССИВ НИКАКИЕ ID НЕ ЗАПИСЫВАЮТСЯ НАДО ДОРАБОТРАТЬ ФУНКИЮ AddGuests В РЕПОЗИТОРИИ И ВАЩЕ НЕ ФАКТ ЧТО ЭТО НАДО!! ПРОВЕРИТЬ!!
 		//добавляем юзеров
 		if _, err := m.adapter.Guests.CreateGuests(ctx, &mockGuestsToAdd); err != nil {
 			return mockGuestsIds, err

@@ -70,13 +70,13 @@ func (r *GuestsRepository) CreateGuests(ctx context.Context, guests *[]domain.Gu
 	return dGuests, nil
 }
 
-//TODO:сделать подсчет общего кол-ва времени на сайте для юзера
-func (r *GuestsRepository) Find(ctx context.Context, opts domain.FindGuestsOptions) ([]domain.Guest, error) {
+// TODO:сделать подсчет общего кол-ва времени на сайте для юзера
+func (r *GuestsRepository) Find(ctx context.Context, opts domain.FindGuestsOptions) ([]domain.Guest, int64, error) {
 	db := getDB(ctx, r.db)
 
 	var mGuests *[]GuestDTO
 
-	query := db.Table("guests g").
+	query := db.Table("guests g").Debug().
 		Select(`
 	g.id,
 	g.domain_id, 
@@ -84,6 +84,12 @@ func (r *GuestsRepository) Find(ctx context.Context, opts domain.FindGuestsOptio
 	MIN(gs.created_at) AS first_visit,
 	MAX(gs.created_at) AS last_visit,
 	COUNT(gs.id) AS sessions_count,
+	SUM(CASE 
+			WHEN gs.end_time IS NOT NULL
+			THEN EXTRACT(EPOCH FROM (gs.end_time - gs.created_at))
+			ELSE EXTRACT(EPOCH FROM (gs.last_active - gs.created_at))
+		END
+	) AS total_seconds_on_site,
 	EXISTS(
 	SELECT 1 FROM guest_sessions ss
 	WHERE ss.guest_id=g.id AND ss.active=true AND ss.end_time IS NULL
@@ -93,11 +99,11 @@ func (r *GuestsRepository) Find(ctx context.Context, opts domain.FindGuestsOptio
 	`).Where("g.domain_id=?", opts.DomainID)
 
 	if opts.StartDate != nil && opts.EndDate != nil {
-		query = query.Where("EXISTS (SELECT 1 FROM guest_sessions gs2 WHERE gs2.created_at >= ? AND gs2.created_at <= ?)", opts.StartDate, opts.EndDate)
+		query = query.Where("g.id IN (SELECT gs2.guest_id FROM guest_sessions gs2 WHERE gs2.created_at >= ? AND gs2.created_at <= ?)", opts.StartDate, opts.EndDate)
 	} else if opts.StartDate != nil {
-		query = query.Where("EXISTS (SELECT 1 FROM guest_sessions gs2 WHERE gs2.created_at >= ?)", opts.StartDate)
+		query = query.Where("g.id IN (SELECT gs2.guest_id FROM guest_sessions gs2 WHERE gs2.created_at >= ?)", opts.StartDate)
 	} else if opts.EndDate != nil {
-		query = query.Where("EXISTS (SELECT 1 FROM guest_sessions gs2 WHERE gs2.created_at <= ?)", opts.EndDate)
+		query = query.Where("g.id IN (SELECT gs2.guest_id FROM guest_sessions gs2 WHERE gs2.created_at <= ?)", opts.EndDate)
 	}
 
 	query = query.Group("g.id, g.domain_id, g.f_id")
@@ -111,9 +117,14 @@ func (r *GuestsRepository) Find(ctx context.Context, opts domain.FindGuestsOptio
 
 	if err := query.Order("last_visit ASC").Find(&mGuests).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, domain.ErrGuestsNotFound
+			return nil, 0, domain.ErrGuestsNotFound
 		}
-		return nil, err
+		return nil, 0, err
+	}
+
+	var count int64
+	if err := db.Model(&Guest{}).Where("domain_id = ?", opts.DomainID).Count(&count).Error; err != nil{
+		return nil, 0, err
 	}
 
 	var guests []domain.Guest
@@ -122,5 +133,5 @@ func (r *GuestsRepository) Find(ctx context.Context, opts domain.FindGuestsOptio
 		guests = append(guests, guest.ToDomain())
 	}
 
-	return guests, nil
+	return guests, count, nil
 }

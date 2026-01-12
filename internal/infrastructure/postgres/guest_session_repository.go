@@ -204,7 +204,9 @@ func (d *GuestSessionRepository) SetLastActive(ctx context.Context, session_ids 
 
 	db := getDB(ctx, d.db)
 
-	if err := db.Model(&GuestSession{}).Where("id IN ?", session_ids).Update("last_active", last_active).Error; err != nil {
+	if err := db.Model(&GuestSession{}).Where("id IN ?", session_ids).
+		Updates(map[string]interface{}{"last_active": last_active, "end_time": nil, "active": true}).
+		Error; err != nil {
 		return err
 	}
 

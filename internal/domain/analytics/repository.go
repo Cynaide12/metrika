@@ -20,7 +20,7 @@ type FindGuestsOptions struct {
 type GuestsRepository interface {
 	FirstOrCreate(ctx context.Context, fingerprint string, domain_id uint) (*Guest, error)
 	CreateGuests(ctx context.Context, guests *[]Guest) ([]Guest, error)
-	Find(ctx context.Context, opts FindGuestsOptions) ([]Guest, error) 
+	Find(ctx context.Context, opts FindGuestsOptions) ([]Guest, int64, error)
 }
 
 type GuestSessionRepositoryByRangeDateOptions struct {
