@@ -17,3 +17,8 @@ func NewUintPointer(u uint) *uint {
 func NewTimePointer(t time.Time) *time.Time{
 	return &t
 }
+
+
+func NewStringPointer(s string) *string {
+	return &s
+}

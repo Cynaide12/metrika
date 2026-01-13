@@ -24,6 +24,16 @@ func (uc *GetGuestsUseCase) Execute(ctx context.Context, opts domain.FindGuestsO
 		opts.Limit = pointers.NewIntPointer(100)
 	}
 
+	//default order
+	if opts.Order == nil {
+		opts.Order = pointers.NewStringPointer("last_visit")
+	}
+
+	//default order type
+	if opts.OrderType == nil {
+		opts.OrderType = pointers.NewStringPointer("ASC")
+	}
+
 	guests, total, err := uc.guests.Find(ctx, opts)
 	if err != nil && !errors.Is(err, domain.ErrGuestsNotFound) {
 		return nil, 0, err

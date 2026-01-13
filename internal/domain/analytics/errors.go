@@ -13,4 +13,5 @@ var (
 	ErrSessionInvalid = errors.New("session invalid")
 	ErrRecordEventsNotFound = errors.New("record events not found")
 	ErrGuestsNotFound = errors.New("guests not found")
+	ErrFindGuestsOrderNotAllowed = errors.New("invalid order")
 )

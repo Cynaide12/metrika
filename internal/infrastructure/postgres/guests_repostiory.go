@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"fmt"
 	domain "metrika/internal/domain/analytics"
 
 	"gorm.io/gorm"
@@ -70,8 +71,16 @@ func (r *GuestsRepository) CreateGuests(ctx context.Context, guests *[]domain.Gu
 	return dGuests, nil
 }
 
-// TODO:сделать подсчет общего кол-ва времени на сайте для юзера
 func (r *GuestsRepository) Find(ctx context.Context, opts domain.FindGuestsOptions) ([]domain.Guest, int64, error) {
+	var allowedOrders = map[string]string{
+		"first_visit":           "first_visit",
+		"last_visit":            "last_visit",
+		"guest_id":              "g.id",
+		"total_seconds_on_site": "total_seconds_on_site",
+		"is_online":             "is_online",
+		"sessions_count":        "sessions_count",
+	}
+
 	db := getDB(ctx, r.db)
 
 	var mGuests *[]GuestDTO
@@ -108,6 +117,13 @@ func (r *GuestsRepository) Find(ctx context.Context, opts domain.FindGuestsOptio
 
 	query = query.Group("g.id, g.domain_id, g.f_id")
 
+	countQuery := *query
+
+	var count int64
+	if err := countQuery.Count(&count).Error; err != nil {
+		return nil, 0, err
+	}
+
 	if opts.Limit != nil {
 		query = query.Limit(*opts.Limit)
 	}
@@ -115,15 +131,20 @@ func (r *GuestsRepository) Find(ctx context.Context, opts domain.FindGuestsOptio
 		query = query.Offset(*opts.Offset)
 	}
 
-	if err := query.Order("last_visit ASC").Find(&mGuests).Error; err != nil {
+	if opts.Order != nil && opts.OrderType != nil {
+		columnName, ok := allowedOrders[*opts.Order]
+		if !ok {
+			return nil, 0, domain.ErrFindGuestsOrderNotAllowed
+		}
+		query.Order(fmt.Sprintf("%s %s", columnName, *opts.OrderType))
+	} else {
+		query.Order("last_visit ASC")
+	}
+
+	if err := query.Find(&mGuests).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, 0, domain.ErrGuestsNotFound
 		}
-		return nil, 0, err
-	}
-
-	var count int64
-	if err := db.Model(&Guest{}).Where("domain_id = ?", opts.DomainID).Count(&count).Error; err != nil{
 		return nil, 0, err
 	}
 

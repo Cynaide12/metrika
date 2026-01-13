@@ -287,7 +287,17 @@ func (h *Handler) GetGuests(w http.ResponseWriter, r *http.Request) {
 		opts.Offset = &offset
 	}
 
-	guests, total,  err := h.getGuests.Execute(r.Context(), opts)
+	order := r.URL.Query().Get("order")
+	if order != "" {
+		opts.Order = &order
+	}
+
+	orderType := r.URL.Query().Get("order_type")
+	if orderType != "" {
+		opts.OrderType = &orderType
+	}
+
+	guests, total, err := h.getGuests.Execute(r.Context(), opts)
 	if err != nil {
 		h.log.Error("ошибка при получении гостей с базы")
 		w.WriteHeader(http.StatusInternalServerError)
@@ -298,7 +308,7 @@ func (h *Handler) GetGuests(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, r, GetGuestsResponse{
 		Response: response.OK(),
 		Guests:   *guests,
-		Total: total,
+		Total:    total,
 	})
 
 }
