@@ -156,3 +156,35 @@ func (r *GuestsRepository) Find(ctx context.Context, opts domain.FindGuestsOptio
 
 	return guests, count, nil
 }
+
+func (r *GuestsRepository) ByID(ctx context.Context, guest_id uint) (*domain.Guest, error) {
+	db := getDB(ctx, r.db)
+
+	var mGuest GuestDTO
+
+	if err := db.Table("guests g").Select(`
+	g.id, 
+	g.domain_id, 
+	g.f_id, 
+	SUM(
+		CASE
+			WHEN gs.end_time IS NOT NULL
+			THEN EXTRACT(EPOCH FROM (gs.end_time - gs.created_at))
+			ELSE EXTRACT (EPOCH FROM (gs.last_active - gs.created_at))
+		END	
+		) AS total_seconds_on_site,
+	MIN(gs.created_at) AS first_visit,
+	MAX(gs.created_at) AS last_visit,
+	COUNT(gs.id) AS sessions_count,
+	EXISTS(SELECT 1 FROM guest_sessions ss WHERE ss.guest_id=g.id AND active=true AND end_time IS NULL) AS is_online
+		`).Joins("LEFT JOIN guest_sessions gs ON g.id=gs.guest_id").Where("g.id=?", guest_id).Group("g.id").First(&mGuest).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, domain.ErrGuestsNotFound
+		}
+		return nil, err
+	}
+
+	guest := mGuest.ToDomain()
+
+	return &guest, nil
+}

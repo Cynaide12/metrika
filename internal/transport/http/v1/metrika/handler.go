@@ -1,6 +1,7 @@
 package metrika
 
 import (
+	"errors"
 	"log/slog"
 	domain "metrika/internal/domain/analytics"
 	"metrika/internal/usecase/analytics"
@@ -22,6 +23,7 @@ type Handler struct {
 	getCountActiveSessions *metrika.ActiveSessionsUseCase
 	getSessionsByInterval  *metrika.SessionsByIntervalUseCase
 	getGuests              *analytics.GetGuestsUseCase
+	getGuest               *analytics.GetGuestUseCase
 }
 
 func NewHandler(
@@ -30,6 +32,7 @@ func NewHandler(
 	getCountActiveSessions *metrika.ActiveSessionsUseCase,
 	getSessionsByInterval *metrika.SessionsByIntervalUseCase,
 	getGuests *analytics.GetGuestsUseCase,
+	getGuest *analytics.GetGuestUseCase,
 ) *Handler {
 	return &Handler{
 		log,
@@ -37,6 +40,7 @@ func NewHandler(
 		getCountActiveSessions,
 		getSessionsByInterval,
 		getGuests,
+		getGuest,
 	}
 }
 
@@ -311,4 +315,35 @@ func (h *Handler) GetGuests(w http.ResponseWriter, r *http.Request) {
 		Total:    total,
 	})
 
+}
+
+type GetGuestResponse struct {
+	Response response.Response `json:"response"`
+	Guest domain.Guest `json:"guest"`
+}
+
+func (h *Handler) GetGuest(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		render.JSON(w, r, response.BadRequest("bad guest id"))
+		return
+	}
+
+	guest, err := h.getGuest.Execute(r.Context(), uint(id))
+	if err != nil {
+		if errors.Is(err, domain.ErrGuestNotFound) {
+			w.WriteHeader(http.StatusBadRequest)
+			render.JSON(w, r, response.BadRequest("guest not found"))
+			return
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		render.JSON(w, r, response.Error("failed to get user"))
+		return
+	}
+
+	render.JSON(w,r, GetGuestResponse{
+		Response: response.OK(),
+		Guest: *guest,
+	})
 }

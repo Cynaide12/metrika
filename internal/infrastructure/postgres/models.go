@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	analytics "metrika/internal/domain/analytics"
 	"time"
 )
 
@@ -55,6 +56,15 @@ type Guest struct {
 	DomainID    uint           `gorm:"column:domain_id;NOT NULL"`
 	Fingerprint string         `gorm:"column:f_id" json:"f_id"`
 	Sessions    []GuestSession `gorm:"foreignkey:GuestID;constraint:OnDelete:CASCADE" json:"sessions,omitempty"`
+}
+
+func (g Guest) ToDomain() *analytics.Guest {
+	return &analytics.Guest{
+		ID: g.ID,
+		DomainID: g.DomainID,
+		Fingerprint: g.Fingerprint,
+		
+	}
 }
 
 type GuestSession struct {

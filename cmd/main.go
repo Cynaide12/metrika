@@ -155,6 +155,7 @@ func setupRouter(cfg *config.Config, log *slog.Logger, tracker *tracker.Tracker,
 	recordevuc := analuc.NewCollectRecordEventsUseCase(repos.record_events)
 	getguestse := analuc.NewGetGuestSessionUseCase(repos.guests, repos.guest_sessions, repos.domains, log)
 	getGuestsuc := analuc.NewGetGuestsUseCase(repos.guests, log)
+	getGuestuc := analuc.NewGetGuestUseCase(repos.guests, log)
 
 	tokens := jwt.NewJwtProvider(cfg.JWTSecret)
 
@@ -170,12 +171,13 @@ func setupRouter(cfg *config.Config, log *slog.Logger, tracker *tracker.Tracker,
 
 	analyticsHandler := analhandler.NewHandler(log, evuc, getguestse, recordevuc)
 	authorizationHandler := authhandler.NewHandler(log, loginuc, refreshuc, registeruc, logoutuc, jwtProvider)
-	metrikaHandler := methandler.NewHandler(log, guestSessionsByRangeDateuc, activeSessionsuc, guestSessionByIntervaluc, getGuestsuc)
+	metrikaHandler := methandler.NewHandler(log, guestSessionsByRangeDateuc, activeSessionsuc, guestSessionByIntervaluc, getGuestsuc, getGuestuc)
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Group(func(r chi.Router) {
 			r.Use(mid.AuthMiddleware(log, cfg.JWTSecret, *cfg, *jwtProvider))
 			r.Route("/metrika", func(r chi.Router) {
+				r.Get("/guests/{id}", metrikaHandler.GetGuest)
 				r.Route("/{domain_id}", func(r chi.Router) {
 					r.Get("/guests", metrikaHandler.GetGuests)
 					r.Get("/guests/visits", metrikaHandler.GetGuestSessionByRangeDate)
