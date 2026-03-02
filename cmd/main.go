@@ -155,6 +155,7 @@ func setupRouter(cfg *config.Config, log *slog.Logger, tracker *tracker.Tracker,
 	recordevuc := analuc.NewCollectRecordEventsUseCase(repos.record_events)
 	getguestse := analuc.NewGetGuestSessionUseCase(repos.guests, repos.guest_sessions, repos.domains, log)
 	getGuestsuc := analuc.NewGetGuestsUseCase(repos.guests, log)
+	getRecordEventsUc := analuc.NewGetRecordEventsUseCase(repos.record_events)
 
 	tokens := jwt.NewJwtProvider(cfg.JWTSecret)
 
@@ -168,7 +169,7 @@ func setupRouter(cfg *config.Config, log *slog.Logger, tracker *tracker.Tracker,
 	activeSessionsuc := metrika.NewAciveSessionsUseCase(log, repos.guest_sessions)
 	guestSessionByIntervaluc := metrika.NewSessionsByIntervalUseCase(repos.guest_sessions)
 
-	analyticsHandler := analhandler.NewHandler(log, evuc, getguestse, recordevuc)
+	analyticsHandler := analhandler.NewHandler(log, evuc, getguestse, recordevuc, getRecordEventsUc)
 	authorizationHandler := authhandler.NewHandler(log, loginuc, refreshuc, registeruc, logoutuc, jwtProvider)
 	metrikaHandler := methandler.NewHandler(log, guestSessionsByRangeDateuc, activeSessionsuc, guestSessionByIntervaluc, getGuestsuc)
 
@@ -194,6 +195,7 @@ func setupRouter(cfg *config.Config, log *slog.Logger, tracker *tracker.Tracker,
 		r.Route("/analytics", func(r chi.Router) {
 			r.Post("/events", analyticsHandler.AddEvent)
 			r.Post("/{session_id}/record", analyticsHandler.AddRecordEvents)
+			r.Get("/{session_id}/record", analyticsHandler.GetRecordEvents)
 			r.Post("/sessions", analyticsHandler.CreateGuestSession)
 		})
 

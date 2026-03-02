@@ -1,7 +1,7 @@
 //изменить название
 module metrika
 
-go 1.23.4
+go 1.26.0
 
 require (
 	github.com/fatih/color v1.18.0

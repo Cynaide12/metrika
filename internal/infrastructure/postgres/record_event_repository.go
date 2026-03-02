@@ -44,7 +44,7 @@ func (r *RecordEventRepository) GetBySessionId(ctx context.Context, session_id u
 
 	var mEvents []RecordEvent
 
-	if err := db.Model(&RecordEvent{}).Where("session_id=?", session_id).Order("BY timestamp ASC").Find(&mEvents).Error; err != nil {
+	if err := db.Model(&RecordEvent{}).Where("session_id=?", session_id).Order("timestamp ASC").Find(&mEvents).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, domain.ErrRecordEventsNotFound
 		}

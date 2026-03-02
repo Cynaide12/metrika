@@ -23,6 +23,7 @@ type Handler struct {
 	events       *analytics.CollectEventsUseCase
 	sessions     *analytics.GetGuestSessionUseCase
 	recordEvents *analytics.CollectRecordEventsUseCase
+	getRecordEvents        *analytics.GetRecordEventsUseCase
 }
 
 type CollectEventsRequest struct {
@@ -41,12 +42,15 @@ type CollectEventRequest struct {
 func NewHandler(log *slog.Logger,
 	events *analytics.CollectEventsUseCase,
 	sessions *analytics.GetGuestSessionUseCase,
-	recordEvents *analytics.CollectRecordEventsUseCase) *Handler {
+	recordEvents *analytics.CollectRecordEventsUseCase,
+	getRecordEvents        *analytics.GetRecordEventsUseCase,
+	) *Handler {
 	return &Handler{
 		log,
 		events,
 		sessions,
 		recordEvents,
+		getRecordEvents,
 	}
 }
 
@@ -164,5 +168,32 @@ func (h *Handler) CreateGuestSession(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, r, CreateNewSessionResponse{
 		UserId:    session.GuestID,
 		SessionId: session.ID,
+	})
+}
+
+type GetRecordEventsResponse struct{
+	Events *[]domain.RecordEvent
+	Response response.Response
+}
+
+func (h *Handler) GetRecordEvents(w http.ResponseWriter, r *http.Request) {
+	session_id, err := strconv.Atoi(chi.URLParam(r, "session_id"))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		render.JSON(w, r, response.BadRequest("invalid session_id"))
+		return
+	}
+
+	events, err := h.getRecordEvents.Execute(r.Context(), uint(session_id))
+	if err != nil && !errors.Is(err, domain.ErrRecordEventsNotFound) {
+		w.WriteHeader(http.StatusInternalServerError)
+		render.JSON(w, r, response.Error("internal error"))
+		return
+	}
+
+
+	render.JSON(w,r,GetRecordEventsResponse{
+		Events: events,
+		Response: response.OK(),
 	})
 }

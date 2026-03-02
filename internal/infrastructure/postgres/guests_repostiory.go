@@ -70,7 +70,7 @@ func (r *GuestsRepository) CreateGuests(ctx context.Context, guests *[]domain.Gu
 	return dGuests, nil
 }
 
-//TODO:сделать подсчет общего кол-ва времени на сайте для юзера
+// TODO:сделать подсчет общего кол-ва времени на сайте для юзера
 func (r *GuestsRepository) Find(ctx context.Context, opts domain.FindGuestsOptions) ([]domain.Guest, error) {
 	db := getDB(ctx, r.db)
 
