@@ -69,6 +69,28 @@ func (d *DomainRepository) GetDomainGuests(ctx context.Context, domainId uint) (
 	return &guests, nil
 }
 
+func (d *DomainRepository) GetDomainGuestsByFingerprints(ctx context.Context, domainId uint, fingerprints []string) (*[]domain.Guest, error) {
+	db := getDB(ctx, d.db)
+
+	var mGuests []Guest
+
+	if err := db.Model(&Guest{}).Where("domain_id = ? AND f_id IN ?", domainId, fingerprints).Find(&mGuests).Error; err != nil {
+		return nil, err
+	}
+
+	var guests []domain.Guest
+
+	for _, guest := range mGuests {
+		guests = append(guests, domain.Guest{
+			ID:          guest.ID,
+			DomainID:    guest.DomainID,
+			Fingerprint: guest.Fingerprint,
+		})
+	}
+
+	return &guests, nil
+}
+
 func (d *DomainRepository) GetCountDomainGuests(ctx context.Context, domain_id uint) (int64, error) {
 	db := getDB(ctx, d.db)
 

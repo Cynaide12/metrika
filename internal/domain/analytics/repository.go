@@ -9,18 +9,30 @@ type EventsRepository interface {
 	SaveEvents(ctx context.Context, events *[]Event) error
 }
 
+var FindGuestAllowedOrders = map[string]bool{
+	"first_visit":          true,
+	"last_visit":           true,
+	"guest_id":             true,
+	"total_second_on_site": true,
+	"is_online":            true,
+	"session_count":        true,
+}
+
 type FindGuestsOptions struct {
 	DomainID  uint
 	StartDate *time.Time
 	EndDate   *time.Time
 	Limit     *int
 	Offset    *int
+	Order     *string
+	OrderType *string
 }
 
 type GuestsRepository interface {
 	FirstOrCreate(ctx context.Context, fingerprint string, domain_id uint) (*Guest, error)
 	CreateGuests(ctx context.Context, guests *[]Guest) ([]Guest, error)
-	Find(ctx context.Context, opts FindGuestsOptions) ([]Guest, error) 
+	Find(ctx context.Context, opts FindGuestsOptions) ([]Guest, int64, error)
+	ByID(ctx context.Context, guest_id uint) (*Guest, error) 
 }
 
 type GuestSessionRepositoryByRangeDateOptions struct {
@@ -59,6 +71,7 @@ type DomainRepository interface {
 	ByURL(ctx context.Context, url string) (*Domain, error)
 	AddDomain(ctx context.Context, site_url string) (*Domain, error)
 	GetDomainGuests(ctx context.Context, domainId uint) (*[]Guest, error)
+	GetDomainGuestsByFingerprints(ctx context.Context, domainId uint, fingerprints []string) (*[]Guest, error)
 	GetCountDomainGuests(ctx context.Context, domain_id uint) (int64, error)
 }
 

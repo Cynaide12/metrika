@@ -104,32 +104,34 @@ func (m MockService) seedMockData() (mockDomainId uint, mockGuestsIds []uint, mo
 
 	return dom.ID, mockGuestsIds, mockSessionIds, nil
 }
-
+//todo:сделать вариативность инит данных - с лимитом на добавление/использованием уже существующих/без лимита и использования добавленных
 func (m MockService) initMockGuests(ctx context.Context, mockDomainId uint) ([]uint, error) {
 	var mockGuestsIds []uint
 
-	IsFilledGuests, guestsToGenerate, err := m.checkLimitDomainGuests(ctx, mockDomainId)
+	IsFilledGuests, _, err := m.checkLimitDomainGuests(ctx, mockDomainId)
 	if err != nil {
 		return mockGuestsIds, err
 	}
 
+	var mockGuestsToAdd []domain.Guest
+	var fingerprints []string
 	//если юзеры уже добавлены до максимума - не добавляем
 	if !IsFilledGuests {
-		var mockGuestsToAdd []domain.Guest
-		for range guestsToGenerate {
+		for range 100 {
+			mockGuest := m.generator.GenerateMockGuest(mockDomainId)
 			//генерируем юзера
-			mockGuestsToAdd = append(mockGuestsToAdd, m.generator.GenerateMockGuest(mockDomainId))
+			mockGuestsToAdd = append(mockGuestsToAdd, mockGuest)
+			fingerprints = append(fingerprints, mockGuest.Fingerprint)
 		}
 
-		//TODO: НЕ ЗАБЫТЬ ЧТО В МАССИВ НИКАКИЕ ID НЕ ЗАПИСЫВАЮТСЯ НАДО ДОРАБОТРАТЬ ФУНКИЮ AddGuests В РЕПОЗИТОРИИ И ВАЩЕ НЕ ФАКТ ЧТО ЭТО НАДО!! ПРОВЕРИТЬ!!
 		//добавляем юзеров
 		if _, err := m.adapter.Guests.CreateGuests(ctx, &mockGuestsToAdd); err != nil {
 			return mockGuestsIds, err
 		}
 	}
 
-	//получаем юзеров домена
-	mockGuests, err := m.adapter.Domains.GetDomainGuests(ctx, mockDomainId)
+	//получаем юзеров домена по массиву fingerprints чтобы использовать добавленных
+	mockGuests, err := m.adapter.Domains.GetDomainGuestsByFingerprints(ctx, mockDomainId, fingerprints)
 	if err != nil {
 		return mockGuestsIds, err
 	}

@@ -1,6 +1,7 @@
 package metrika
 
 import (
+	"errors"
 	"log/slog"
 	domain "metrika/internal/domain/analytics"
 	"metrika/internal/usecase/analytics"
@@ -22,6 +23,7 @@ type Handler struct {
 	getCountActiveSessions *metrika.ActiveSessionsUseCase
 	getSessionsByInterval  *metrika.SessionsByIntervalUseCase
 	getGuests              *analytics.GetGuestsUseCase
+	getGuest               *analytics.GetGuestUseCase
 }
 
 func NewHandler(
@@ -30,6 +32,7 @@ func NewHandler(
 	getCountActiveSessions *metrika.ActiveSessionsUseCase,
 	getSessionsByInterval *metrika.SessionsByIntervalUseCase,
 	getGuests *analytics.GetGuestsUseCase,
+	getGuest *analytics.GetGuestUseCase,
 ) *Handler {
 	return &Handler{
 		log,
@@ -37,6 +40,7 @@ func NewHandler(
 		getCountActiveSessions,
 		getSessionsByInterval,
 		getGuests,
+		getGuest,
 	}
 }
 
@@ -228,6 +232,7 @@ func (h *Handler) GetGuestSessionsByInterval(w http.ResponseWriter, r *http.Requ
 type GetGuestsResponse struct {
 	Response response.Response `json:"response"`
 	Guests   []domain.Guest    `json:"guests"`
+	Total    int64             `json:"total"`
 }
 
 func (h *Handler) GetGuests(w http.ResponseWriter, r *http.Request) {
@@ -255,7 +260,7 @@ func (h *Handler) GetGuests(w http.ResponseWriter, r *http.Request) {
 
 	end := r.URL.Query().Get("end_date")
 	if end != "" {
-		end_date, err := time.Parse(time.RFC3339Nano, r.URL.Query().Get("end"))
+		end_date, err := time.Parse(time.RFC3339Nano, end)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			render.JSON(w, r, response.BadRequest("bad end date"))
@@ -286,7 +291,17 @@ func (h *Handler) GetGuests(w http.ResponseWriter, r *http.Request) {
 		opts.Offset = &offset
 	}
 
-	guests, err := h.getGuests.Execute(r.Context(), opts)
+	order := r.URL.Query().Get("order")
+	if order != "" {
+		opts.Order = &order
+	}
+
+	orderType := r.URL.Query().Get("order_type")
+	if orderType != "" {
+		opts.OrderType = &orderType
+	}
+
+	guests, total, err := h.getGuests.Execute(r.Context(), opts)
 	if err != nil {
 		h.log.Error("ошибка при получении гостей с базы")
 		w.WriteHeader(http.StatusInternalServerError)
@@ -297,6 +312,38 @@ func (h *Handler) GetGuests(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, r, GetGuestsResponse{
 		Response: response.OK(),
 		Guests:   *guests,
+		Total:    total,
 	})
 
+}
+
+type GetGuestResponse struct {
+	Response response.Response `json:"response"`
+	Guest domain.Guest `json:"guest"`
+}
+
+func (h *Handler) GetGuest(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		render.JSON(w, r, response.BadRequest("bad guest id"))
+		return
+	}
+
+	guest, err := h.getGuest.Execute(r.Context(), uint(id))
+	if err != nil {
+		if errors.Is(err, domain.ErrGuestNotFound) {
+			w.WriteHeader(http.StatusBadRequest)
+			render.JSON(w, r, response.BadRequest("guest not found"))
+			return
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		render.JSON(w, r, response.Error("failed to get user"))
+		return
+	}
+
+	render.JSON(w,r, GetGuestResponse{
+		Response: response.OK(),
+		Guest: *guest,
+	})
 }

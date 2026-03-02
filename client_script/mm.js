@@ -17064,6 +17064,4 @@ const setupListeners = async () => {
   );
 };
 
-document.addEventListener('DOMContentLoaded', () => {
-  setupListeners();
-});
+setupListeners();
