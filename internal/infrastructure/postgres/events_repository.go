@@ -27,6 +27,7 @@ func (d *EventsRepository) SaveEvents(ctx context.Context, events *[]domain.Even
 			Element:   event.Element,
 			PageURL:   event.PageURL,
 			Timestamp: event.Timestamp,
+			Data:      event.Data,
 		})
 	}
 

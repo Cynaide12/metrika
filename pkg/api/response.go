@@ -13,13 +13,13 @@ type Response struct {
 }
 
 const (
-	StatusOK    = "OK"
-	StatusError = "Error"
-	StatusAlreadyExists = "AlreadyExists"
+	StatusOK                = "OK"
+	StatusError             = "Error"
+	StatusAlreadyExists     = "AlreadyExists"
 	StatusFileExtNotAllowed = "FileExtNotAllowed"
-	StatusBadFileSize = "BadFileSize"
-	StatusNotFound = "NotFound"
-	StatusBadRequest = "BadRequest"
+	StatusBadFileSize       = "BadFileSize"
+	StatusNotFound          = "NotFound"
+	StatusBadRequest        = "BadRequest"
 )
 
 func OK() Response {
@@ -35,13 +35,19 @@ func Error(err string) Response {
 	}
 }
 
+func BadRequest(err string) Response {
+	return Response{
+		Status: StatusBadRequest,
+		Error:  err,
+	}
+}
+
 func ErrorWithStatus(status string, err string) Response {
 	return Response{
 		Status: status,
 		Error:  err,
 	}
 }
-
 
 func ValidateRequest(req interface{}) error {
 	validate := validator.New()
@@ -51,7 +57,7 @@ func ValidateRequest(req interface{}) error {
 func ValidationError(errs validator.ValidationErrors) Response {
 	var errMsgs []string
 
-	for _, err := range errs {	
+	for _, err := range errs {
 		switch err.ActualTag() {
 		case "required":
 			errMsgs = append(errMsgs, fmt.Sprintf("Field %s is required", err.Field()))

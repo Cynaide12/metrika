@@ -31,15 +31,14 @@ func (ec *CollectEventsUseCase) Execute(
 	ctx context.Context,
 	events *[]domain.Event,
 ) error {
-	// ec.tracker.TrackEvent(event)
 	return ec.tx.WithinTransaction(ctx, func(ctx context.Context) error {
 		if err := ec.events.SaveEvents(ctx, events); err != nil {
 			return err
 		}
 
-		ids := make(map[uint]struct{})
+		var ids []uint
 		for _, e := range *events {
-			ids[e.SessionID] = struct{}{}
+			ids = append(ids, e.SessionID)
 		}
 
 		//TODO:учесть что с момента отправки задачи в очередь на сохранение может пройти много времени

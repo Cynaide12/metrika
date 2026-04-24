@@ -1,8 +1,9 @@
 package auth
 
 import (
-    "context"
-    domain "metrika/internal/domain/auth"
+	"context"
+	"errors"
+	domain "metrika/internal/domain/auth"
 )
 
 type RefreshUseCase struct {
@@ -29,6 +30,9 @@ func (uc *RefreshUseCase) Execute(
 
     session, err := uc.sessions.ByID(ctx, claims.SessionID)
     if err != nil {
+        if errors.Is(err, domain.ErrSessionNotFound){
+            return domain.Tokens{}, domain.ErrInvalidRefreshToken
+        }
         return domain.Tokens{}, err
     }
 

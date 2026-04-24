@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	analytics "metrika/internal/domain/analytics"
 	"time"
 )
 
@@ -12,12 +13,20 @@ type Model struct {
 
 type Event struct {
 	Model
-	SessionID uint      `gorm:"column:session_id;NOT NULL"`
-	Type      string    `gorm:"column:type;NOT NULL"`
-	PageURL   string    `gorm:"column:page_url;NOT NULL"`
-	Element   string    `gorm:"column:element;NOT NULL"`
-	Timestamp time.Time `gorm:"column:timestamp;NOT NULL"`
-	// Data      map[string]interface{} `gorm:"column:data;NOT NULL"`
+	SessionID uint                   `gorm:"column:session_id;NOT NULL"`
+	Type      string                 `gorm:"column:type;NOT NULL"`
+	PageURL   string                 `gorm:"column:page_url;NOT NULL"`
+	Element   string                 `gorm:"column:element;NOT NULL"`
+	Timestamp time.Time              `gorm:"column:timestamp;NOT NULL"`
+	Data      map[string]interface{} `gorm:"serializer:json;column:data"`
+}
+
+type RecordEvent struct {
+	Model
+	SessionID uint                   `gorm:"column:session_id;NOT NULL"`
+	Type      int                 `gorm:"column:type;NOT NULL"`
+	Timestamp int64              `gorm:"column:timestamp;NOT NULL"`
+	Data      map[string]interface{} `gorm:"serializer:json;column:data"`
 }
 
 type User struct {
@@ -33,26 +42,36 @@ type UserSession struct {
 	UserID       uint   `gorm:"column:user_id;NOT NULL"`
 	RefreshToken string `gorm:"column:refresh_token"`
 	UserAgent    string `gorm:"column:user_agent"`
+	IPAddress    string `gorm:"column:ip_address"`
 }
 
 type Domain struct {
 	Model
-	SiteURL string `gorm:"column:site_url;unique;NOT NULL" json:"site_url"`
-	Guests   []Guest `gorm:"foreignkey:DomainID;constraint:OnDelete:CASCADE"`
+	SiteURL string  `gorm:"column:site_url;unique;NOT NULL" json:"site_url"`
+	Guests  []Guest `gorm:"foreignkey:DomainID;constraint:OnDelete:CASCADE"`
 }
 
 type Guest struct {
 	Model
-	DomainID    uint          `gorm:"column:domain_id;NOT NULL"`
-	Fingerprint string        `gorm:"column:f_id" json:"f_id"`
+	DomainID    uint           `gorm:"column:domain_id;NOT NULL"`
+	Fingerprint string         `gorm:"column:f_id" json:"f_id"`
 	Sessions    []GuestSession `gorm:"foreignkey:GuestID;constraint:OnDelete:CASCADE" json:"sessions,omitempty"`
+}
+
+func (g Guest) ToDomain() *analytics.Guest {
+	return &analytics.Guest{
+		ID: g.ID,
+		DomainID: g.DomainID,
+		Fingerprint: g.Fingerprint,
+		
+	}
 }
 
 type GuestSession struct {
 	Model
-	GuestID     uint      `gorm:"column:guest_id;NOT NULL" json:"guest_id"`
-	IPAddress  string    `gorm:"column:ip_address;NOT NULL" json:"ip_address"`
-	Active     bool      `gorm:"column:active;NOT NULL;default:false"`
+	GuestID    uint       `gorm:"column:guest_id;NOT NULL" json:"guest_id"`
+	IPAddress  string     `gorm:"column:ip_address;NOT NULL" json:"ip_address"`
+	Active     bool       `gorm:"column:active;NOT NULL;default:false"`
 	EndTime    *time.Time `gorm:"column:end_time;default:NULL"`
-	LastActive time.Time `gorm:"column:last_active;NOT NULL;default:CURRENT_TIMESTAMP"`
+	LastActive time.Time  `gorm:"column:last_active;NOT NULL;default:CURRENT_TIMESTAMP"`
 }

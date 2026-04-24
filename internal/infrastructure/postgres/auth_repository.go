@@ -44,15 +44,16 @@ func (r *AuthRepository) CreateUser(ctx context.Context, auser *auth.User) error
 		Password: auser.Password.Hash,
 	}
 
-	if err := db.Model(&user).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return auth.ErrUserNotFound
+	if err := db.Model(&user).Create(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return auth.ErrUserAlreadyExists
 		}
 		return err
 	}
 
 	//записываем id созданного юзера
 	auser.SetID(user.ID)
+
 
 	return nil
 }

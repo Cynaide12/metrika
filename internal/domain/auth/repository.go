@@ -13,4 +13,5 @@ type SessionRepository interface {
 	Create(ctx context.Context, s *Session) error
 	ByID(ctx context.Context, id uint) (*Session, error)
 	Update(ctx context.Context, s *Session) error
+	Delete(ctx context.Context, id uint) error
 }

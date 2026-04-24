@@ -34,6 +34,7 @@ func (c *CleanupBatchSessionsUseCase) CleanupBatchSessions(ctx context.Context, 
 		session_ids = append(session_ids, session.ID)
 	}
 
+
 	//закрываем их
 	if err := c.sessions.CloseSessions(ctx, session_ids); err != nil {
 		return err

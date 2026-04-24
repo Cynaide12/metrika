@@ -13,8 +13,11 @@ import (
 	"metrika/internal/infrastructure/tracker"
 	analhandler "metrika/internal/transport/http/v1/analytics"
 	authhandler "metrika/internal/transport/http/v1/auth"
+	methandler "metrika/internal/transport/http/v1/metrika"
+	mid "metrika/internal/transport/http/v1/middleware"
 	analuc "metrika/internal/usecase/analytics"
 	authuc "metrika/internal/usecase/auth"
+	"metrika/internal/usecase/metrika"
 	"metrika/pkg/logger/sl"
 
 	"net/http"
@@ -30,6 +33,7 @@ import (
 type repos struct {
 	domains        analytics.DomainRepository
 	events         analytics.EventsRepository
+	record_events  analytics.RecordEventRepository
 	guests         analytics.GuestsRepository
 	guest_sessions analytics.GuestSessionRepository
 	sessions       auth.SessionRepository
@@ -59,6 +63,7 @@ func main() {
 	}
 
 	events := postgres.NewEventsRepository(db)
+	record_events := postgres.NewRecordEventRepository(db)
 	guest_sessions := postgres.NewGuestSessionRepository(db)
 	domains := postgres.NewDomainRepository(db)
 	sessions := postgres.NewSessionRepository(db)
@@ -73,17 +78,18 @@ func main() {
 		guests:         guests,
 		guest_sessions: guest_sessions,
 		users:          users,
+		record_events:  record_events,
 	}
 
 	tracker := tracker.New(1000, time.Second*15, 10000, events)
 
 	cleanup_stale_sessions_uc := analuc.NewCleanupBatchSessionsUseCase(log, guest_sessions, tx)
 
-	sessions_worker := sessionworker.NewSessionsWorker(log, time.Second*15, cleanup_stale_sessions_uc)
+	sessions_worker := sessionworker.NewSessionsWorker(log, time.Second*15, cleanup_stale_sessions_uc, make(chan struct{}))
 
 	go sessions_worker.StartSessionManager()
 
-	setupMockGenerator(log, tracker, cfg, repos)
+	// setupMockGenerator(log, tracker, cfg, repos)
 
 	log.Info("db connect succesful")
 
@@ -131,7 +137,7 @@ func setupRouter(cfg *config.Config, log *slog.Logger, tracker *tracker.Tracker,
 	}
 
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{"*"},
+		AllowedOrigins: []string{"http://*, https://", "http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:5500"},
 		AllowedMethods: []string{
 			http.MethodHead,
 			http.MethodGet,
@@ -146,19 +152,57 @@ func setupRouter(cfg *config.Config, log *slog.Logger, tracker *tracker.Tracker,
 	}))
 
 	evuc := analuc.NewCollectEventsUseCase(repos.events, tracker, repos.guest_sessions, tx)
-	createsesuc := analuc.NewCreateGuestSessionUseCase(repos.guests, repos.guest_sessions, repos.domains, log)
+	recordevuc := analuc.NewCollectRecordEventsUseCase(repos.record_events)
+	getguestse := analuc.NewGetGuestSessionUseCase(repos.guests, repos.guest_sessions, repos.domains, log)
+	getGuestsuc := analuc.NewGetGuestsUseCase(repos.guests, log)
+	getGuestuc := analuc.NewGetGuestUseCase(repos.guests, log)
+
+	getRecordEventsUc := analuc.NewGetRecordEventsUseCase(repos.record_events)
 
 	tokens := jwt.NewJwtProvider(cfg.JWTSecret)
 
+	jwtProvider := jwt.NewJwtProvider(cfg.JWTSecret)
+
 	loginuc := authuc.NewLoginUseCase(repos.users, repos.sessions, tokens)
 	refreshuc := authuc.NewRefreshUseCase(repos.sessions, tokens)
-	registeruc := authuc.NewRegisterUseCase(repos.users, repos.sessions, tokens)
+	registeruc := authuc.NewRegisterUseCase(repos.users, repos.sessions, tokens, log, tx)
+	logoutuc := authuc.NewLogoutUseCase(repos.sessions, log, *jwtProvider)
+	guestSessionsByRangeDateuc := metrika.NewSessionsByRangeDateUseCase(repos.guest_sessions)
+	activeSessionsuc := metrika.NewAciveSessionsUseCase(log, repos.guest_sessions)
+	guestSessionByIntervaluc := metrika.NewSessionsByIntervalUseCase(repos.guest_sessions)
 
-	analyticsHandler := analhandler.NewHandler(log, evuc, createsesuc)
-	authhandler.NewHandler(log, loginuc, refreshuc, registeruc)
+	analyticsHandler := analhandler.NewHandler(log, evuc, getguestse, recordevuc, getRecordEventsUc)
+	authorizationHandler := authhandler.NewHandler(log, loginuc, refreshuc, registeruc, logoutuc, jwtProvider)
+	metrikaHandler := methandler.NewHandler(log, guestSessionsByRangeDateuc, activeSessionsuc, guestSessionByIntervaluc, getGuestsuc, getGuestuc)
 
-	r.Post("/api/v1/events", analyticsHandler.AddEvent())
-	r.Post("/api/v1/sessions", analyticsHandler.CreateGuestSession())
+	r.Route("/api/v1", func(r chi.Router) {
+		r.Group(func(r chi.Router) {
+			r.Use(mid.AuthMiddleware(log, cfg.JWTSecret, *cfg, *jwtProvider))
+			r.Route("/metrika", func(r chi.Router) {
+				r.Get("/guests/{id}", metrikaHandler.GetGuest)
+				r.Route("/{domain_id}", func(r chi.Router) {
+					r.Get("/guests", metrikaHandler.GetGuests)
+					r.Get("/guests/visits", metrikaHandler.GetGuestSessionByRangeDate)
+					r.Get("/guests/byinterval", metrikaHandler.GetGuestSessionsByInterval)
+					r.Get("/guests/online", metrikaHandler.GetCountActiveSessions)
+				})
+			})
+		})
+		r.Route("/auth", func(r chi.Router) {
+			r.Post("/login", authorizationHandler.Login)
+			r.Put("/refresh", authorizationHandler.Refresh)
+			r.Delete("/logout", authorizationHandler.Logout)
+			r.Post("/register", authorizationHandler.Register)
+		})
+
+		r.Route("/analytics", func(r chi.Router) {
+			r.Post("/events", analyticsHandler.AddEvent)
+			r.Post("/{session_id}/record", analyticsHandler.AddRecordEvents)
+			r.Get("/{session_id}/record", analyticsHandler.GetRecordEvents)
+			r.Post("/sessions", analyticsHandler.CreateGuestSession)
+		})
+
+	})
 
 	log.Info("starting server", slog.String("address", srv.Addr))
 

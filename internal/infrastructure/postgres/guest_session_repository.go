@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	domain "metrika/internal/domain/analytics"
 	"time"
 
@@ -69,24 +70,143 @@ func (d *GuestSessionRepository) CreateSessions(ctx context.Context, sessions *[
 	return dDessions, nil
 }
 
-// TODO: доделать
 func (d *GuestSessionRepository) GetCountActiveSessions(ctx context.Context, domain_id uint) (int64, error) {
 	db := getDB(ctx, d.db)
 
-	var count int64
+	res := db.Exec("SELECT * FROM guest_sessions s LEFT JOIN guests u ON u.id=s.guest_id WHERE s.active = true AND u.domain_id=?", domain_id)
 
-	if err := db.Debug().Model(&domain.GuestSession{}).Exec("SELECT * FROM guest_sessions s LEFT JOIN guests u ON u.id=s.guest_id WHERE s.active = true AND u.domain_id=?", domain_id).Error; err != nil {
-		return 0, err
+	if res.Error != nil {
+		return 0, res.Error
 	}
 
-	return count, nil
+	return res.RowsAffected, nil
 }
 
-func (d *GuestSessionRepository) SetLastActive(ctx context.Context, session_ids map[uint]struct{}, last_active time.Time) error {
+func (d *GuestSessionRepository) GetVisitsByInterval(
+	ctx context.Context,
+	domain_id uint,
+	opts domain.GetVisitsByIntervalOptions,
+) (*[]domain.GuestSessionsByTimeBucket, error) {
+
+	var buckets []domain.GuestSessionsByTimeBucket
+
+	query := `
+	WITH params AS (
+	  SELECT ?::int AS interval_minutes, ?::int AS interval_diviser, ?::timestamptz AS start_ts, ?::timestamptz AS end_ts
+	),
+	bounds AS (
+	  SELECT
+	    (date_trunc('hour', start_ts)
+	      + ((floor(extract(minute FROM start_ts)/params.interval_diviser::numeric)::int * params.interval_minutes::int) || ' minutes')::interval) AS start_bucket,
+	    (date_trunc('hour', end_ts)
+	      + ((floor(extract(minute FROM end_ts)/params.interval_diviser::numeric)::int * params.interval_minutes::int) || ' minutes')::interval) AS end_bucket
+	  FROM params
+	),
+	agg AS (
+	  SELECT
+	    (date_trunc('hour', created_at)
+	      + ((floor(extract(minute FROM created_at)/params.interval_diviser::numeric)::int * params.interval_minutes::int) || ' minutes')::interval) AS time_bucket,
+	    COUNT(*) AS visits,
+	    COUNT(DISTINCT guest_id) AS uniques
+	  FROM guest_sessions, params
+	  WHERE created_at BETWEEN params.start_ts AND params.end_ts
+	  GROUP BY 1
+	)
+	SELECT gs.time_bucket,
+	       COALESCE(a.visits, 0) AS visits,
+	       COALESCE(a.uniques, 0) AS uniques
+	FROM bounds, params,
+	     generate_series(bounds.start_bucket, bounds.end_bucket, (params.interval_minutes::int || ' minutes')::interval) AS gs(time_bucket)
+	LEFT JOIN agg a USING (time_bucket)
+	ORDER BY time_bucket;
+	`
+	err := d.db.Debug().
+		Raw(query, opts.IntervalMinutes, opts.IntervalDiviser, opts.Start, opts.End).
+		Scan(&buckets).
+		Error
+
+	return &buckets, err
+}
+
+func (d *GuestSessionRepository) ByRangeDate(ctx context.Context, opts domain.GuestSessionRepositoryByRangeDateOptions) (*[]domain.GuestSession, error) {
+	db := getDB(ctx, d.db)
+
+	var mSessions []GuestSession
+
+	query := db.Debug().Model(GuestSession{})
+
+	if opts.StartDate != nil {
+		query.Where("NOT created_at < ?", opts.StartDate)
+	}
+	if opts.EndDate != nil {
+		query.Where("NOT created_at > ?", opts.EndDate)
+	}
+	if opts.WithoutActive != nil {
+		query.Where("active = false")
+	}
+	if opts.GuestID != nil {
+		query.Where("guest_id = ?", opts.GuestID)
+	}
+	if opts.Limit != nil {
+		query.Limit(*opts.Limit)
+	}
+	if opts.Offset != nil {
+		query.Offset(*opts.Offset)
+	}
+
+	if err := query.Order("id ASC").Debug().Find(&mSessions).Error; err != nil {
+		if errors.Is(err, domain.ErrSessionsNotFound) {
+			return nil, domain.ErrSessionsNotFound
+		}
+		return nil, err
+	}
+
+	var sessions []domain.GuestSession
+
+	for _, session := range mSessions {
+		sessions = append(sessions, domain.GuestSession{
+			ID:         session.ID,
+			GuestID:    session.GuestID,
+			EndTime:    session.EndTime,
+			LastActive: session.LastActive,
+			Active:     session.Active,
+		})
+	}
+
+	return &sessions, nil
+}
+
+// TODO: протестить
+func (d *GuestSessionRepository) LastActiveByGuestId(ctx context.Context, guest_id uint) (*domain.GuestSession, error) {
+	db := getDB(ctx, d.db)
+
+	var mSession GuestSession
+
+	if err := db.Debug().Model(GuestSession{}).Where("active = true AND guest_id = ?", guest_id).Last(&mSession).Error; err != nil {
+		if errors.Is(err, domain.ErrLastActiveSessionNotFound) {
+			return nil, domain.ErrLastActiveSessionNotFound
+		}
+
+		return nil, err
+	}
+
+	session := domain.GuestSession{ID: mSession.ID,
+		GuestID:    mSession.GuestID,
+		IPAddress:  mSession.IPAddress,
+		LastActive: mSession.LastActive,
+		EndTime:    mSession.EndTime,
+	}
+
+	return &session, nil
+}
+
+func (d *GuestSessionRepository) SetLastActive(ctx context.Context, session_ids []uint, last_active time.Time) error {
 
 	db := getDB(ctx, d.db)
 
-	if err := db.Model(&GuestSession{}).Where("id IN ?", session_ids).Update("last_active", last_active).Error; err != nil {
+	if err := db.Model(&GuestSession{}).Where("id IN ?", session_ids).
+		Updates(map[string]interface{}{"last_active": last_active, "end_time": nil, "active": true}).
+		Error; err != nil {
 		return err
 	}
 
@@ -127,7 +247,7 @@ func (d *GuestSessionRepository) GetStaleSessions(ctx context.Context, limit int
 func (d *GuestSessionRepository) CloseSessions(ctx context.Context, session_ids []uint) error {
 	db := getDB(ctx, d.db)
 
-	if err := db.Exec("UPDATE user_sessions SET active = false, end_time = NOW() WHERE id = ANY($1)", session_ids).Error; err != nil {
+	if err := db.Exec("UPDATE guest_sessions SET active = false, end_time = NOW() WHERE id = ANY($1)", session_ids).Error; err != nil {
 		return err
 	}
 	return nil
